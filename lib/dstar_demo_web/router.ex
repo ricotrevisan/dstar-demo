@@ -27,6 +27,9 @@ defmodule DstarDemoWeb.Router do
     get "/components", ServerComponentsController, :home
     get "/signals", SignalsController, :home
     get "/scripts", ScriptHelpersController, :home
+    get "/presence", PresenceController, :home
+    post "/presence/join", PresenceController, :join
+    post "/presence/ping", PresenceController, :ping
     post "/ds/:module/:event", Dstar.Dispatch, [], alias: false
   end
 

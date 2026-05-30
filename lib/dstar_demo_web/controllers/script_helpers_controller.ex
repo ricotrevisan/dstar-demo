@@ -37,20 +37,20 @@ defmodule DstarDemoWeb.ScriptHelpersController do
             <.action_button
               id="script-execute"
               label="Execute"
-              icon="hero-bolt"
+              icon="hero-bolt-micro"
               click={post("execute")}
               active
             />
             <.action_button
               id="script-console"
               label="Console log"
-              icon="hero-command-line"
+              icon="hero-command-line-micro"
               click={post("console")}
             />
             <.action_button
               id="script-redirect"
               label="Redirect preview"
-              icon="hero-arrow-turn-up-right"
+              icon="hero-arrow-turn-up-right-micro"
               click={post("redirect")}
             />
           </div>

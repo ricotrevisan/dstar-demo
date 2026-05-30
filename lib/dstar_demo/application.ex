@@ -12,6 +12,7 @@ defmodule DstarDemo.Application do
       Dstar.Utility.StreamRegistry,
       {DNSCluster, query: Application.get_env(:dstar_demo, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: DstarDemo.PubSub},
+      DstarDemoWeb.Presence,
       # Start a worker by calling: DstarDemo.Worker.start_link(arg)
       # {DstarDemo.Worker, arg},
       # Start to serve requests, typically the last entry

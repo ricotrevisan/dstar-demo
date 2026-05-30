@@ -69,20 +69,20 @@ defmodule DstarDemoWeb.SignalsController do
             <.action_button
               id="signals-read"
               label="Read"
-              icon="hero-eye"
+              icon="hero-eye-micro"
               click={post("read")}
               active
             />
             <.action_button
               id="signals-patch"
               label="Patch signals"
-              icon="hero-arrow-up-tray"
+              icon="hero-arrow-up-tray-micro"
               click={post("patch")}
             />
             <.action_button
               id="signals-remove"
               label="Remove"
-              icon="hero-trash"
+              icon="hero-trash-micro"
               click={post("remove")}
             />
           </div>

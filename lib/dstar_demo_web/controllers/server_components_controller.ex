@@ -36,21 +36,21 @@ defmodule DstarDemoWeb.ServerComponentsController do
             <.action_button
               id="component-profile"
               label="Profile"
-              icon="hero-identification"
+              icon="hero-identification-micro"
               click={"$component_kind = 'profile'; #{post("profile")}"}
               active={@component_kind == "profile"}
             />
             <.action_button
               id="component-timeline"
               label="Timeline"
-              icon="hero-queue-list"
+              icon="hero-queue-list-micro"
               click={"$component_kind = 'timeline'; #{post("timeline")}"}
               active={@component_kind == "timeline"}
             />
             <.action_button
               id="component-deploy"
               label="Deploy"
-              icon="hero-rocket-launch"
+              icon="hero-rocket-launch-micro"
               click={"$component_kind = 'deploy'; #{post("deploy")}"}
               active={@component_kind == "deploy"}
             />

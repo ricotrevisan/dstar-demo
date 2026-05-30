@@ -20,8 +20,32 @@ if System.get_env("PHX_SERVER") do
   config :dstar_demo, DstarDemoWeb.Endpoint, server: true
 end
 
-config :dstar_demo, DstarDemoWeb.Endpoint,
-  http: [port: String.to_integer(System.get_env("PORT", "4000"))]
+port = String.to_integer(System.get_env("PORT", "4000"))
+
+config :dstar_demo, DstarDemoWeb.Endpoint, http: [port: port]
+
+# In development, automatically enable mkcert-backed HTTPS when the
+# certificate files exist. HTTPS listens one port higher than PORT, so
+# PORT=4000 serves HTTP on 4000 and HTTPS on 4001.
+dev_ssl_key_path = System.get_env("SSL_KEY_PATH", "priv/cert/localhost-key.pem")
+dev_ssl_cert_path = System.get_env("SSL_CERT_PATH", "priv/cert/localhost.pem")
+
+https_enabled? =
+  config_env() == :dev and
+    String.downcase(System.get_env("HTTPS", "true")) in ["1", "true", "yes", "on"] and
+    File.exists?(dev_ssl_key_path) and
+    File.exists?(dev_ssl_cert_path)
+
+if https_enabled? do
+  config :dstar_demo, DstarDemoWeb.Endpoint,
+    https: [
+      ip: {127, 0, 0, 1},
+      port: port + 1,
+      cipher_suite: :strong,
+      keyfile: dev_ssl_key_path,
+      certfile: dev_ssl_cert_path
+    ]
+end
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.

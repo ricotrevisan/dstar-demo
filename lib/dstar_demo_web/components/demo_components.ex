@@ -11,13 +11,14 @@ defmodule DstarDemoWeb.DemoComponents do
     statics: DstarDemoWeb.static_paths()
 
   @demos [
-    {"Command Validation", "/commands", "hero-command-line"},
-    {"Active Search", "/search", "hero-magnifying-glass"},
-    {"Streaming Dashboard", "/streaming", "hero-signal"},
-    {"Patch Lab", "/patch-lab", "hero-squares-plus"},
-    {"Components", "/components", "hero-cube-transparent"},
-    {"Signals", "/signals", "hero-adjustments-horizontal"},
-    {"Scripts", "/scripts", "hero-code-bracket-square"}
+    {"Command Validation", "/commands", "hero-command-line-micro"},
+    {"Active Search", "/search", "hero-magnifying-glass-micro"},
+    {"Streaming Dashboard", "/streaming", "hero-signal-micro"},
+    {"Patch Lab", "/patch-lab", "hero-squares-plus-micro"},
+    {"Components", "/components", "hero-cube-transparent-micro"},
+    {"Signals", "/signals", "hero-adjustments-horizontal-micro"},
+    {"Scripts", "/scripts", "hero-code-bracket-square-micro"},
+    {"Presence", "/presence", "hero-user-group-micro"}
   ]
 
   attr :active, :string, required: true
@@ -54,7 +55,7 @@ defmodule DstarDemoWeb.DemoComponents do
                 @active != label && "text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
               ]}
             >
-              <.icon name={icon <> "-micro"} class="size-4" />
+              <.icon name={icon} class="size-4" />
               <span>{label}</span>
             </a>
           </nav>
@@ -153,7 +154,7 @@ defmodule DstarDemoWeb.DemoComponents do
   attr :id, :string, required: true
   attr :label, :string, required: true
   attr :click, :string, required: true
-  attr :icon, :string, default: "hero-arrow-path"
+  attr :icon, :string, default: "hero-arrow-path-micro"
   attr :active, :boolean, default: false
 
   def action_button(assigns) do
@@ -167,7 +168,7 @@ defmodule DstarDemoWeb.DemoComponents do
         !@active && "border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900"
       ]}
     >
-      <.icon name={@icon <> "-micro"} class="size-4" />
+      <.icon name={@icon} class="size-4" />
       <span>{@label}</span>
     </button>
     """
