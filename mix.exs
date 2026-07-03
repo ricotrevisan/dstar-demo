@@ -61,25 +61,8 @@ defmodule DstarDemo.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:dstar, path: dstar_path()}
+      {:dstar, "~> 0.1.3"}
     ]
-  end
-
-  defp dstar_path do
-    sibling = Path.expand("../../dstar", __DIR__)
-    codex_worktree = "/Users/rico/.codex/worktrees/a73d/dstar"
-
-    System.get_env("DSTAR_PATH") ||
-      cond do
-        File.exists?(Path.join([sibling, "lib", "dstar", "controller.ex"])) ->
-          sibling
-
-        File.exists?(Path.join([codex_worktree, "lib", "dstar", "controller.ex"])) ->
-          codex_worktree
-
-        true ->
-          sibling
-      end
   end
 
   # Aliases are shortcuts or tasks specific to the current project.

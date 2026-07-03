@@ -52,6 +52,41 @@ const liveSocket = new LiveSocket("/live", Socket, {
   hooks: {...colocatedHooks},
 })
 
+const presenceRoom = document.querySelector("[data-presence-leave-url]")
+if (presenceRoom) {
+  let presenceLeaveSent = false
+
+  const sendPresenceLeave = () => {
+    if (presenceLeaveSent) return
+
+    const leaveUrl = presenceRoom.dataset.presenceLeaveUrl
+    const tabId = sessionStorage.getItem("dstar_demo_tab")
+    const presenceInstance = presenceRoom.dataset.presenceInstance
+    if (!leaveUrl || !tabId || !presenceInstance) return
+
+    presenceLeaveSent = true
+    const payload = new URLSearchParams({
+      tabId,
+      presenceInstance: presenceRoom.dataset.presenceInstance,
+      csrf: csrfToken,
+    })
+
+    if (navigator.sendBeacon && navigator.sendBeacon(leaveUrl, payload)) return
+
+    fetch(leaveUrl, {
+      method: "POST",
+      body: payload,
+      keepalive: true,
+      headers: {"content-type": "application/x-www-form-urlencoded;charset=UTF-8"},
+    }).catch(() => {})
+  }
+
+  window.addEventListener("pagehide", sendPresenceLeave)
+  window.addEventListener("pageshow", event => {
+    if (event.persisted) presenceLeaveSent = false
+  })
+}
+
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))

@@ -1,32 +1,40 @@
-defmodule DstarDemoWeb.SignalsController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.SignalsPage do
+  use DstarDemoWeb, :dstar_page
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, _params) do
-    conn
-    |> signal(:scope, "release")
-    |> signal(:filter, "open")
-    |> signal(:ephemeral, "client-note")
-    |> signal(:server_tick, 0)
-    |> signal(:audit_trail, "mounted")
-    |> signal(:last_read, %{})
+    assign(conn,
+      scope: "release",
+      filter: "open",
+      ephemeral: "client-note",
+      server_tick: 0,
+      audit_trail: "mounted",
+      last_read: %{}
+    )
   end
 
-  def home(conn, _params), do: conn
-
-  @impl Dstar
+  @impl Dstar.Page
   def render(assigns) do
     ~H"""
     <.demo_shell
       active="Signals"
       title="Signals lifecycle"
       eyebrow="Inspector"
-      summary="Read incoming signals, patch server-owned values, and remove client signals while watching the current flow."
-      signals={init_signals(@conn)}
+      summary="Inspect the signals handed to handle_event/3, patch server-owned values, and remove client signals while watching the current flow."
+      signals={
+        %{
+          scope: @scope,
+          filter: @filter,
+          ephemeral: @ephemeral,
+          server_tick: @server_tick,
+          audit_trail: @audit_trail,
+          last_read: @last_read
+        }
+      }
     >
       <:aside>
         <.demo_facts items={[
-          "read_signals_result/1 inspects the request payload.",
+          "handle_event/3 receives the request signals already read.",
           "patch_signals/3 updates server-owned signals.",
           "remove_signals/3 clears selected client state.",
           "The inspector itself is patched after each command."
@@ -70,20 +78,20 @@ defmodule DstarDemoWeb.SignalsController do
               id="signals-read"
               label="Read"
               icon="hero-eye-micro"
-              click={post("read")}
+              click={event("read")}
               active
             />
             <.action_button
               id="signals-patch"
               label="Patch signals"
               icon="hero-arrow-up-tray-micro"
-              click={post("patch")}
+              click={event("patch")}
             />
             <.action_button
               id="signals-remove"
               label="Remove"
               icon="hero-trash-micro"
-              click={post("remove")}
+              click={event("remove")}
             />
           </div>
 
@@ -105,7 +113,9 @@ defmodule DstarDemoWeb.SignalsController do
             <li class="rounded-md bg-zinc-900 px-3 py-2">
               1. Client sends scope, filter, and ephemeral.
             </li>
-            <li class="rounded-md bg-zinc-900 px-3 py-2">2. Server reads signals from Plug.Conn.</li>
+            <li class="rounded-md bg-zinc-900 px-3 py-2">
+              2. Dstar.Page.Plug reads the signals and starts SSE.
+            </li>
             <li class="rounded-md bg-zinc-900 px-3 py-2">3. Server patches or removes signals.</li>
             <li class="rounded-md bg-zinc-900 px-3 py-2">4. Inspector HTML is patched.</li>
           </ol>
@@ -115,40 +125,33 @@ defmodule DstarDemoWeb.SignalsController do
     """
   end
 
-  @impl Dstar
+  @impl Dstar.Page
   def handle_event(conn, "read", signals) do
-    {:ok, read} = Dstar.read_signals_result(conn)
+    state =
+      client_state(signals, tick: current_tick(signals), audit: "signals from handle_event/3")
 
     conn
-    |> assign_client_signals(signals)
-    |> signal(:server_tick, current_tick(signals))
-    |> signal(:last_read, Map.drop(read, ["csrf", "tabId"]))
-    |> signal(:audit_trail, "read_signals_result")
-    |> patch_element(&inspector/1, to: "signals-inspector")
+    |> patch_signals(state)
+    |> patch(&inspector/1, state)
   end
 
   def handle_event(conn, "patch", signals) do
     tick = next_tick(signals)
-    audit = "patch_signals tick #{tick}"
+    state = client_state(signals, tick: tick, audit: "patch_signals tick #{tick}")
 
     conn
-    |> assign_client_signals(signals)
-    |> signal(:server_tick, tick)
-    |> signal(:audit_trail, audit)
-    |> signal(:last_read, Map.drop(signals, ["csrf", "tabId"]))
-    |> Dstar.patch_signals(%{server_tick: tick, audit_trail: audit})
-    |> patch_element(&inspector/1, to: "signals-inspector")
+    |> patch_signals(state)
+    |> patch(&inspector/1, state)
   end
 
   def handle_event(conn, "remove", signals) do
+    state = client_state(signals, tick: current_tick(signals), audit: "remove_signals ephemeral")
+    state = %{state | ephemeral: nil}
+
     conn
-    |> assign_client_signals(signals)
-    |> signal(:server_tick, current_tick(signals))
-    |> signal(:ephemeral, nil)
-    |> signal(:audit_trail, "remove_signals ephemeral")
-    |> signal(:last_read, Map.drop(signals, ["csrf", "tabId"]))
-    |> Dstar.remove_signals("ephemeral")
-    |> patch_element(&inspector/1, to: "signals-inspector")
+    |> patch_signals(state)
+    |> remove_signals("ephemeral")
+    |> patch(&inspector/1, state)
   end
 
   attr :scope, :string, required: true
@@ -193,6 +196,19 @@ defmodule DstarDemoWeb.SignalsController do
     """
   end
 
+  defp client_state(signals, tick: tick, audit: audit) do
+    %{
+      scope: signals["scope"] || "release",
+      filter: signals["filter"] || "open",
+      ephemeral: Map.get(signals, "ephemeral", "client-note"),
+      server_tick: tick,
+      audit_trail: audit,
+      # Drop last_read too: it round-trips as a signal, so leaving the
+      # previous snapshot inside the new one nests it a level per event.
+      last_read: Map.drop(signals, ["csrf", "_csrf_token", "tabId", "last_read"])
+    }
+  end
+
   defp next_tick(signals) do
     case signals["server_tick"] do
       tick when is_integer(tick) -> tick + 1
@@ -211,12 +227,5 @@ defmodule DstarDemoWeb.SignalsController do
     end
   rescue
     ArgumentError -> 0
-  end
-
-  defp assign_client_signals(conn, signals) do
-    conn
-    |> signal(:scope, signals["scope"] || "release")
-    |> signal(:filter, signals["filter"] || "open")
-    |> signal(:ephemeral, Map.get(signals, "ephemeral", "client-note"))
   end
 end

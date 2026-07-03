@@ -1,5 +1,5 @@
-defmodule DstarDemoWeb.ActiveSearchController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.ActiveSearchPage do
+  use DstarDemoWeb, :dstar_page
 
   @items [
     %{
@@ -41,21 +41,19 @@ defmodule DstarDemoWeb.ActiveSearchController do
     %{name: "Launch Readiness", type: "Checklist", owner: "Product", tags: ~w(validation ready)}
   ]
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, _params) do
     results = search("", "all")
 
-    conn
-    |> signal(:query, "")
-    |> signal(:segment, "all")
-    |> signal(:searchPending, false)
-    |> assign(:results, results)
-    |> assign(:result_count, length(results))
+    assign(conn,
+      query: "",
+      segment: "all",
+      results: results,
+      result_count: length(results)
+    )
   end
 
-  def home(conn, _params), do: conn
-
-  @impl Dstar
+  @impl Dstar.Page
   def render(assigns) do
     ~H"""
     <.demo_shell
@@ -63,12 +61,12 @@ defmodule DstarDemoWeb.ActiveSearchController do
       title="Active search"
       eyebrow="Signal search"
       summary="Typing changes Datastar signals, the server filters local data, and only the result panel is patched back."
-      signals={init_signals(@conn)}
+      signals={%{query: @query, segment: @segment}}
     >
       <:aside>
         <.demo_facts items={[
           "data-bind keeps the query and segment on the client.",
-          "Typing posts a command with the latest signals.",
+          "Typing posts a page event with the latest signals.",
           "Only #search-results is patched, not the input chrome.",
           "Empty and no-results states are server-rendered."
         ]} />
@@ -87,7 +85,8 @@ defmodule DstarDemoWeb.ActiveSearchController do
                 <input
                   id="search-query"
                   data-bind:query
-                  data-on:input__debounce.240ms={"$searchPending = true; #{post("search")}"}
+                  data-indicator="_searchPending"
+                  data-on:input__debounce.240ms={event("search")}
                   value={@query}
                   placeholder="Try stream, patch, signal, or owner names"
                   autocomplete="off"
@@ -100,7 +99,8 @@ defmodule DstarDemoWeb.ActiveSearchController do
               <button
                 :for={segment <- ["all", "workflow", "dashboard", "tool"]}
                 id={"search-segment-#{segment}"}
-                data-on:click={"$segment = '#{segment}'; $searchPending = true; #{post("search")}"}
+                data-indicator="_searchPending"
+                data-on:click={"$segment = '#{segment}'; #{event("search")}"}
                 class={[
                   "rounded-md px-3 py-2 text-sm font-semibold capitalize transition focus:outline-none focus:ring-2 focus:ring-emerald-300/60",
                   @segment == segment && "bg-emerald-300 text-zinc-950",
@@ -114,7 +114,7 @@ defmodule DstarDemoWeb.ActiveSearchController do
           </div>
 
           <div
-            data-show="$searchPending"
+            data-show="$_searchPending"
             class="mt-5 rounded-md border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100"
           >
             Updating results
@@ -134,8 +134,8 @@ defmodule DstarDemoWeb.ActiveSearchController do
           </p>
           <p class="mt-3 text-sm leading-6 text-zinc-400">
             The input, segment buttons, and page shell stay put while Dstar morphs the result
-            panel. The pending marker is a client signal flipped before the request and cleared by
-            the server.
+            panel. The pending marker is a client-local indicator signal Datastar toggles around
+            each request — it clears even if the request fails.
           </p>
         </aside>
       </section>
@@ -143,19 +143,20 @@ defmodule DstarDemoWeb.ActiveSearchController do
     """
   end
 
-  @impl Dstar
+  @impl Dstar.Page
   def handle_event(conn, "search", signals) do
     query = String.trim(signals["query"] || "")
     segment = signals["segment"] || "all"
     results = search(query, segment)
 
-    conn
-    |> signal(:query, query)
-    |> signal(:segment, segment)
-    |> signal(:searchPending, false)
-    |> assign(:results, results)
-    |> assign(:result_count, length(results))
-    |> patch_element(&result_panel/1, to: "search-results")
+    # The client owns query/segment — echoing them back would clobber
+    # anything typed while this response was in flight.
+    patch(conn, &result_panel/1,
+      results: results,
+      query: query,
+      segment: segment,
+      result_count: length(results)
+    )
   end
 
   attr :results, :list, required: true

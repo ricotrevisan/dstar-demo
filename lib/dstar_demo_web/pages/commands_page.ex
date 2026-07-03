@@ -1,19 +1,18 @@
-defmodule DstarDemoWeb.CommandController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.CommandsPage do
+  use DstarDemoWeb, :dstar_page
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, _params) do
-    conn
-    |> signal(:email, "")
-    |> signal(:first_name, "")
-    |> signal(:last_name, "")
-    |> signal(:intent, "editing")
-    |> signal(:validation, validate(%{}))
+    assign(conn,
+      email: "",
+      first_name: "",
+      last_name: "",
+      intent: "editing",
+      validation: validate(%{})
+    )
   end
 
-  def home(conn, _params), do: conn
-
-  @impl Dstar
+  @impl Dstar.Page
   def render(assigns) do
     ~H"""
     <.demo_shell
@@ -21,15 +20,24 @@ defmodule DstarDemoWeb.CommandController do
       title="Validation is a command"
       eyebrow="Command Validation"
       summary="Inputs bind to Datastar signals. The server validates on signal patches and treats readiness as explicit user intent."
-      signals={init_signals(@conn)}
-      data-on-signal-patch__debounce.300ms={post("validate")}
+      signals={
+        %{
+          email: @email,
+          first_name: @first_name,
+          last_name: @last_name,
+          intent: @intent,
+          validation: @validation
+        }
+      }
+      data-on-signal-patch__debounce.300ms={event("validate")}
+      data-on-signal-patch-filter="{include: /^(email|first_name|last_name)$/}"
     >
       <:aside>
         <.demo_facts items={[
           "No form element, only data-bind inputs and command buttons.",
-          "signal/4 seeds assigns and client signals.",
-          "Dstar.Dispatch starts SSE and invokes handle_event/3.",
-          "patch_element/3 refreshes the validation UI."
+          "use Dstar.Page colocates render/1 and handle_event/3.",
+          "The page's _event route starts SSE before handle_event/3 runs.",
+          "patch/3 re-renders the validation UI from function components."
         ]} />
       </:aside>
 
@@ -83,14 +91,14 @@ defmodule DstarDemoWeb.CommandController do
           <div class="mt-6 flex flex-wrap items-center gap-3">
             <button
               id="command-ready"
-              data-on:click={post("ready")}
+              data-on:click={event("ready")}
               class="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
             >
               <.icon name="hero-check-micro" class="size-4" /> Ready
             </button>
             <button
               id="command-reset"
-              data-on:click={post("reset")}
+              data-on:click={event("reset")}
               class="inline-flex items-center gap-2 rounded-md border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
             >
               <.icon name="hero-arrow-path-micro" class="size-4" /> Reset
@@ -128,15 +136,14 @@ defmodule DstarDemoWeb.CommandController do
     """
   end
 
-  @impl Dstar
+  @impl Dstar.Page
   def handle_event(conn, "validate", signals) do
     validation = validate(signals)
 
     conn
-    |> signal(:validation, validation)
-    |> signal(:intent, "editing")
-    |> patch_element(&validation_panel/1, to: "validation-panel")
-    |> patch_element(&intent_pill/1, to: "intent-pill")
+    |> patch_signals(%{validation: validation, intent: "editing"})
+    |> patch(&validation_panel/1, validation: validation, intent: "editing")
+    |> patch(&intent_pill/1, intent: "editing")
   end
 
   def handle_event(conn, "ready", signals) do
@@ -144,23 +151,28 @@ defmodule DstarDemoWeb.CommandController do
     intent = if ready?(validation), do: "ready", else: "blocked"
 
     conn
-    |> signal(:validation, validation)
-    |> signal(:intent, intent)
-    |> patch_element(&validation_panel/1, to: "validation-panel")
-    |> patch_element(&intent_pill/1, to: "intent-pill")
+    |> patch_signals(%{validation: validation, intent: intent})
+    |> patch(&validation_panel/1, validation: validation, intent: intent)
+    |> patch(&intent_pill/1, intent: intent)
   end
 
+  # Known trade-off: echoing the cleared inputs passes the signal-patch
+  # filter and re-fires one redundant (idempotent) validate ~300ms after a
+  # reset from a non-empty state. Clearing them client-side instead would
+  # arm the same debounce, so the extra round-trip is accepted.
   def handle_event(conn, "reset", _signals) do
     validation = validate(%{})
 
     conn
-    |> signal(:email, "")
-    |> signal(:first_name, "")
-    |> signal(:last_name, "")
-    |> signal(:validation, validation)
-    |> signal(:intent, "editing")
-    |> patch_element(&validation_panel/1, to: "validation-panel")
-    |> patch_element(&intent_pill/1, to: "intent-pill")
+    |> patch_signals(%{
+      email: "",
+      first_name: "",
+      last_name: "",
+      validation: validation,
+      intent: "editing"
+    })
+    |> patch(&validation_panel/1, validation: validation, intent: "editing")
+    |> patch(&intent_pill/1, intent: "editing")
   end
 
   attr :label, :string, required: true

@@ -1,18 +1,14 @@
-defmodule DstarDemoWeb.PatchLabController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.PatchLabPage do
+  use DstarDemoWeb, :dstar_page
 
   @modes ~w(outer inner append prepend before after remove)
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, _params) do
-    conn
-    |> signal(:selected_mode, "outer")
-    |> signal(:patch_count, 0)
+    assign(conn, selected_mode: "outer", patch_count: 0)
   end
 
-  def home(conn, _params), do: conn
-
-  @impl Dstar
+  @impl Dstar.Page
   def render(assigns) do
     assigns = Map.put(assigns, :modes, @modes)
 
@@ -21,8 +17,8 @@ defmodule DstarDemoWeb.PatchLabController do
       active="Patch Lab"
       title="Patch lab"
       eyebrow="DOM patch modes"
-      summary="Each control sends a command that uses a different Datastar patch mode. The target area makes insertion, replacement, and removal explicit."
-      signals={init_signals(@conn)}
+      summary="Each control sends a page event that uses a different Datastar patch mode. The target area makes insertion, replacement, and removal explicit."
+      signals={%{selected_mode: @selected_mode, patch_count: @patch_count}}
     >
       <:aside>
         <.demo_facts items={[
@@ -41,7 +37,8 @@ defmodule DstarDemoWeb.PatchLabController do
             <button
               :for={mode <- @modes}
               id={"patch-mode-#{mode}"}
-              data-on:click={"$selected_mode = '#{mode}'; #{post(mode)}"}
+              data-on:click={"$selected_mode = '#{mode}'; #{event(mode)}"}
+              data-class={mode_classes(mode)}
               class={[
                 "flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold capitalize transition focus:outline-none focus:ring-2 focus:ring-emerald-300/60",
                 @selected_mode == mode && "bg-emerald-300 text-zinc-950",
@@ -59,7 +56,10 @@ defmodule DstarDemoWeb.PatchLabController do
           <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
             <div>
               <p class="text-sm font-semibold text-zinc-100">Patch target</p>
-              <p class="mt-1 text-xs text-zinc-500">Count: {@patch_count} · mode: {@selected_mode}</p>
+              <p class="mt-1 text-xs text-zinc-500">
+                Count: <span data-text="$patch_count">{@patch_count}</span>
+                · mode: <span data-text="$selected_mode">{@selected_mode}</span>
+              </p>
             </div>
             <.pill label="Datastar patch-elements" tone="info" />
           </div>
@@ -99,10 +99,17 @@ defmodule DstarDemoWeb.PatchLabController do
     """
   end
 
-  @impl Dstar
+  @impl Dstar.Page
   for mode <- @modes do
     def handle_event(conn, unquote(mode), signals),
       do: apply_patch_mode(conn, unquote(mode), signals)
+  end
+
+  # Keeps the mode buttons' highlight in sync with the $selected_mode
+  # signal after events; the server only renders the initial state.
+  defp mode_classes(mode) do
+    "{'bg-emerald-300 text-zinc-950': $selected_mode === '#{mode}', " <>
+      "'border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800': $selected_mode !== '#{mode}'}"
   end
 
   attr :selected_mode, :string, required: true
@@ -139,16 +146,15 @@ defmodule DstarDemoWeb.PatchLabController do
 
     conn =
       conn
-      |> signal(:selected_mode, mode)
-      |> signal(:patch_count, count)
-      |> patch_element(&patch_status/1, to: "patch-status")
+      |> patch_signals(%{selected_mode: mode, patch_count: count})
+      |> patch(&patch_status/1, selected_mode: mode, patch_count: count)
 
     case mode do
       "outer" ->
-        patch_element(conn, lab_target(%{count: count}), to: "lab-target", mode: :outer)
+        patch(conn, &lab_target/1, [count: count], selector: "#lab-target", mode: :outer)
 
       "inner" ->
-        Dstar.patch_elements(
+        patch_elements(
           conn,
           ~s(<p class="text-sm font-semibold text-emerald-100">Inner patch #{count}</p><p class="mt-1 text-sm text-emerald-200/80">Only the children changed.</p>),
           selector: "#lab-target",
@@ -156,31 +162,31 @@ defmodule DstarDemoWeb.PatchLabController do
         )
 
       "append" ->
-        Dstar.patch_elements(conn, patch_badge(%{mode: mode, count: count}),
+        patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#patch-list",
           mode: :append
         )
 
       "prepend" ->
-        Dstar.patch_elements(conn, patch_badge(%{mode: mode, count: count}),
+        patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#patch-list",
           mode: :prepend
         )
 
       "before" ->
-        Dstar.patch_elements(conn, patch_badge(%{mode: mode, count: count}),
+        patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#anchor-row",
           mode: :before
         )
 
       "after" ->
-        Dstar.patch_elements(conn, patch_badge(%{mode: mode, count: count}),
+        patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#anchor-row",
           mode: :after
         )
 
       "remove" ->
-        Dstar.patch_elements(conn, nil, selector: "#removable-note", mode: :remove)
+        remove_elements(conn, "#removable-note")
     end
   end
 

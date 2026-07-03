@@ -1,82 +1,23 @@
-defmodule DstarDemoWeb.ServerComponentsController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.ComponentStage do
+  @moduledoc """
+  A `Dstar.Component`: the stage UI and its event handlers in one module.
 
-  @impl Dstar
-  def mount(conn, _params) do
+  Pages embed `component_stage/1` as a plain function component; the
+  variant buttons post to `/ds/<module>/<event>` via `event/2`, routed by
+  `dstar_components/2` in the router.
+  """
+
+  use DstarDemoWeb, :dstar_component
+
+  @kinds ~w(profile timeline deploy)
+
+  def handle_event(conn, kind, signals) when kind in @kinds do
+    count = next_count(signals)
+
     conn
-    |> signal(:component_kind, "profile")
-    |> signal(:render_count, 0)
-  end
-
-  def home(conn, _params), do: conn
-
-  @impl Dstar
-  def render(assigns) do
-    ~H"""
-    <.demo_shell
-      active="Components"
-      title="Server-rendered components"
-      eyebrow="HEEx patches"
-      summary="Reusable function components render on the server, then Dstar patches the selected component into a stable target."
-      signals={init_signals(@conn)}
-    >
-      <:aside>
-        <.demo_facts items={[
-          "Each variant is a HEEx function component.",
-          "Commands update component_kind and render_count signals.",
-          "Only #component-stage is patched.",
-          "The same components can be used on first render and SSE patches."
-        ]} />
-      </:aside>
-
-      <section class="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">Variants</p>
-          <div class="mt-4 grid gap-2">
-            <.action_button
-              id="component-profile"
-              label="Profile"
-              icon="hero-identification-micro"
-              click={"$component_kind = 'profile'; #{post("profile")}"}
-              active={@component_kind == "profile"}
-            />
-            <.action_button
-              id="component-timeline"
-              label="Timeline"
-              icon="hero-queue-list-micro"
-              click={"$component_kind = 'timeline'; #{post("timeline")}"}
-              active={@component_kind == "timeline"}
-            />
-            <.action_button
-              id="component-deploy"
-              label="Deploy"
-              icon="hero-rocket-launch-micro"
-              click={"$component_kind = 'deploy'; #{post("deploy")}"}
-              active={@component_kind == "deploy"}
-            />
-          </div>
-        </div>
-
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
-          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p class="text-sm font-semibold text-zinc-100">Component stage</p>
-              <p class="mt-1 text-xs text-zinc-500">renders: {@render_count}</p>
-            </div>
-            <.pill label={@component_kind} tone="good" />
-          </div>
-
-          <.component_stage component_kind={@component_kind} render_count={@render_count} />
-        </div>
-      </section>
-    </.demo_shell>
-    """
-  end
-
-  @impl Dstar
-  for kind <- ~w(profile timeline deploy) do
-    def handle_event(conn, unquote(kind), signals),
-      do: render_component(conn, unquote(kind), signals)
+    |> start()
+    |> patch_signals(%{component_kind: kind, render_count: count})
+    |> patch(&component_stage/1, component_kind: kind, render_count: count)
   end
 
   attr :component_kind, :string, required: true
@@ -177,15 +118,6 @@ defmodule DstarDemoWeb.ServerComponentsController do
       </div>
     </section>
     """
-  end
-
-  defp render_component(conn, kind, signals) do
-    count = next_count(signals)
-
-    conn
-    |> signal(:component_kind, kind)
-    |> signal(:render_count, count)
-    |> patch_element(&component_stage/1, to: "component-stage")
   end
 
   defp next_count(signals) do

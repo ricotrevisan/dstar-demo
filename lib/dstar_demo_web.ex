@@ -48,16 +48,26 @@ defmodule DstarDemoWeb do
     end
   end
 
-  def dstar do
+  def dstar_page do
     quote do
-      use Phoenix.Controller, formats: [:html, :json]
-      use Dstar
-      use Phoenix.Component
+      use Dstar.Page
 
       use Gettext, backend: DstarDemoWeb.Gettext
 
-      import Phoenix.Component, except: [assign: 3]
-      import Plug.Conn
+      import Plug.Conn, except: [assign: 3]
+      import DstarDemoWeb.CoreComponents
+      import DstarDemoWeb.DemoComponents
+
+      alias DstarDemoWeb.Layouts
+
+      unquote(verified_routes())
+    end
+  end
+
+  def dstar_component do
+    quote do
+      use Dstar.Component
+
       import DstarDemoWeb.CoreComponents
       import DstarDemoWeb.DemoComponents
 

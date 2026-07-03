@@ -11,7 +11,7 @@
   </head>
   <body
     data-signals={Jason.encode!(%{csrf: get_csrf_token()})}
-    data-signals:tabId="sessionStorage.getItem('dstar_demo_tab') || (() => { const id = crypto.randomUUID(); sessionStorage.setItem('dstar_demo_tab', id); return id })()"
+    data-signals:tab-id="sessionStorage.getItem('dstar_demo_tab') || (() => { const id = crypto.randomUUID(); sessionStorage.setItem('dstar_demo_tab', id); return id })()"
   >
     {@inner_content}
   </body>

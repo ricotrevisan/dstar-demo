@@ -25,7 +25,7 @@ defmodule DstarDemoWeb.DemoComponents do
   attr :title, :string, required: true
   attr :eyebrow, :string, required: true
   attr :summary, :string, required: true
-  attr :signals, :string, default: nil
+  attr :signals, :map, default: nil, doc: "initial Datastar signals, rendered as data-signals"
   attr :rest, :global
 
   slot :aside
@@ -62,7 +62,7 @@ defmodule DstarDemoWeb.DemoComponents do
         </header>
 
         <section
-          data-signals={@signals}
+          data-signals={@signals && Jason.encode!(@signals)}
           class="grid gap-6 px-4 py-5 sm:px-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-8"
           {@rest}
         >
@@ -110,17 +110,21 @@ defmodule DstarDemoWeb.DemoComponents do
 
   attr :label, :string, required: true
   attr :tone, :string, default: "neutral"
+  attr :rest, :global
 
   def pill(assigns) do
     ~H"""
-    <span class={[
-      "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
-      @tone == "good" && "bg-emerald-300 text-zinc-950",
-      @tone == "warn" && "bg-amber-300/15 text-amber-200",
-      @tone == "bad" && "bg-rose-400/15 text-rose-200",
-      @tone == "info" && "bg-sky-300/15 text-sky-200",
-      @tone == "neutral" && "bg-zinc-800 text-zinc-300"
-    ]}>
+    <span
+      class={[
+        "inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold",
+        @tone == "good" && "bg-emerald-300 text-zinc-950",
+        @tone == "warn" && "bg-amber-300/15 text-amber-200",
+        @tone == "bad" && "bg-rose-400/15 text-rose-200",
+        @tone == "info" && "bg-sky-300/15 text-sky-200",
+        @tone == "neutral" && "bg-zinc-800 text-zinc-300"
+      ]}
+      {@rest}
+    >
       {@label}
     </span>
     """
@@ -156,6 +160,7 @@ defmodule DstarDemoWeb.DemoComponents do
   attr :click, :string, required: true
   attr :icon, :string, default: "hero-arrow-path-micro"
   attr :active, :boolean, default: false
+  attr :rest, :global
 
   def action_button(assigns) do
     ~H"""
@@ -167,6 +172,7 @@ defmodule DstarDemoWeb.DemoComponents do
         @active && "bg-emerald-300 text-zinc-950 hover:bg-emerald-200",
         !@active && "border border-zinc-700 text-zinc-200 hover:border-zinc-500 hover:bg-zinc-900"
       ]}
+      {@rest}
     >
       <.icon name={@icon} class="size-4" />
       <span>{@label}</span>

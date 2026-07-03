@@ -1,18 +1,17 @@
-defmodule DstarDemoWeb.ScriptHelpersController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.ScriptsPage do
+  use DstarDemoWeb, :dstar_page
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, params) do
     redirected? = Map.has_key?(params, "redirected")
 
-    conn
-    |> signal(:script_runs, 0)
-    |> signal(:last_script_action, if(redirected?, do: "redirect complete", else: "idle"))
+    assign(conn,
+      script_runs: 0,
+      last_script_action: if(redirected?, do: "redirect complete", else: "idle")
+    )
   end
 
-  def home(conn, _params), do: conn
-
-  @impl Dstar
+  @impl Dstar.Page
   def render(assigns) do
     ~H"""
     <.demo_shell
@@ -20,7 +19,7 @@ defmodule DstarDemoWeb.ScriptHelpersController do
       title="Script helpers"
       eyebrow="Client actions"
       summary="Dstar can append safe script actions over SSE for one-off browser effects, console diagnostics, and redirects."
-      signals={init_signals(@conn)}
+      signals={%{script_runs: @script_runs, last_script_action: @last_script_action}}
     >
       <:aside>
         <.demo_facts items={[
@@ -38,20 +37,20 @@ defmodule DstarDemoWeb.ScriptHelpersController do
               id="script-execute"
               label="Execute"
               icon="hero-bolt-micro"
-              click={post("execute")}
+              click={event("execute")}
               active
             />
             <.action_button
               id="script-console"
               label="Console log"
               icon="hero-command-line-micro"
-              click={post("console")}
+              click={event("console")}
             />
             <.action_button
               id="script-redirect"
               label="Redirect preview"
               icon="hero-arrow-turn-up-right-micro"
-              click={post("redirect")}
+              click={event("redirect")}
             />
           </div>
 
@@ -72,14 +71,13 @@ defmodule DstarDemoWeb.ScriptHelpersController do
     """
   end
 
-  @impl Dstar
+  @impl Dstar.Page
   def handle_event(conn, "execute", signals) do
     runs = next_runs(signals)
 
     conn
-    |> signal(:script_runs, runs)
-    |> signal(:last_script_action, "execute_script")
-    |> Dstar.execute_script(
+    |> patch_signals(%{script_runs: runs, last_script_action: "execute_script"})
+    |> execute_script(
       "document.documentElement.dataset.dstarScriptPulse = #{Jason.encode!(Integer.to_string(runs))}",
       auto_remove: false,
       attributes: %{"data-demo-script" => "execute"}
@@ -90,9 +88,8 @@ defmodule DstarDemoWeb.ScriptHelpersController do
     runs = next_runs(signals)
 
     conn
-    |> signal(:script_runs, runs)
-    |> signal(:last_script_action, "console_log")
-    |> Dstar.console_log(%{demo: "dstar", helper: "console_log", run: runs},
+    |> patch_signals(%{script_runs: runs, last_script_action: "console_log"})
+    |> console_log(%{demo: "dstar", helper: "console_log", run: runs},
       level: :info,
       auto_remove: false,
       attributes: %{"data-demo-script" => "console"}
@@ -103,9 +100,8 @@ defmodule DstarDemoWeb.ScriptHelpersController do
     runs = next_runs(signals)
 
     conn
-    |> signal(:script_runs, runs)
-    |> signal(:last_script_action, "redirect")
-    |> Dstar.redirect("/scripts?redirected=1",
+    |> patch_signals(%{script_runs: runs, last_script_action: "redirect"})
+    |> redirect("/scripts?redirected=1",
       auto_remove: false,
       attributes: %{"data-demo-script" => "redirect"}
     )

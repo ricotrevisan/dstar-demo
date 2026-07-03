@@ -1,6 +1,8 @@
 defmodule DstarDemoWeb.Router do
   use DstarDemoWeb, :router
 
+  import Dstar.Router
+
   pipeline :browser do
     plug :accepts, ["html"]
     plug :fetch_session
@@ -18,19 +20,17 @@ defmodule DstarDemoWeb.Router do
   scope "/", DstarDemoWeb do
     pipe_through :browser
 
-    get "/", PageController, :home
-    get "/commands", CommandController, :home
-    get "/search", ActiveSearchController, :home
-    get "/streaming", StreamingDashboardController, :home
-    post "/streaming/stream", StreamingDashboardController, :stream
-    get "/patch-lab", PatchLabController, :home
-    get "/components", ServerComponentsController, :home
-    get "/signals", SignalsController, :home
-    get "/scripts", ScriptHelpersController, :home
-    get "/presence", PresenceController, :home
-    post "/presence/join", PresenceController, :join
-    post "/presence/ping", PresenceController, :ping
-    post "/ds/:module/:event", Dstar.Dispatch, [], alias: false
+    dstar("/", HomePage)
+    dstar("/commands", CommandsPage)
+    dstar("/search", ActiveSearchPage)
+    dstar("/streaming", StreamingDashboardPage)
+    dstar("/patch-lab", PatchLabPage)
+    dstar("/components", ServerComponentsPage)
+    dstar("/signals", SignalsPage)
+    dstar("/scripts", ScriptsPage)
+    dstar("/presence", PresencePage)
+
+    dstar_components("/ds", [ComponentStage])
   end
 
   # Other scopes may use custom stacks.

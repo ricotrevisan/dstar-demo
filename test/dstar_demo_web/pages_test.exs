@@ -1,0 +1,353 @@
+defmodule DstarDemoWeb.PagesTest do
+  use DstarDemoWeb.ConnCase
+
+  import Dstar.Test
+
+  test "GET /", %{conn: conn} do
+    conn = get(conn, ~p"/")
+    response = html_response(conn, 200)
+
+    assert response =~ "Dstar server UI showcase"
+
+    # Declared kebab-case so Datastar camelizes it to the exact "tabId"
+    # signal the StreamRegistry reads — HTML lowercases attribute names,
+    # so data-signals:tabId would silently create a "tabid" signal.
+    assert response =~ ~s[data-signals:tab-id=]
+    assert response =~ ~s[href="/commands"]
+    assert response =~ ~s[href="/search"]
+    assert response =~ ~s[href="/streaming"]
+    assert response =~ ~s[href="/patch-lab"]
+    assert response =~ ~s[href="/components"]
+    assert response =~ ~s[href="/signals"]
+    assert response =~ ~s[href="/scripts"]
+  end
+
+  test "GET /commands", %{conn: conn} do
+    conn = get(conn, ~p"/commands")
+
+    response = html_response(conn, 200)
+    assert response =~ "Validation is a command"
+    assert response =~ "data-bind:email"
+    assert response =~ "use Dstar.Page"
+    refute response =~ "<form"
+  end
+
+  test "GET /commands scopes signal-patch revalidation to the bound input signals", %{conn: conn} do
+    response = conn |> get(~p"/commands") |> html_response(200)
+
+    # Without the filter, the server's own validation/intent signal patches
+    # echo back into data-on-signal-patch and re-fire "validate", reverting
+    # the Ready state ~300ms after every click.
+    assert response =~ "data-on-signal-patch-filter"
+    assert response =~ "^(email|first_name|last_name)$"
+  end
+
+  test "GET demo pages", %{conn: conn} do
+    for {path, marker} <- demo_pages() do
+      response =
+        conn
+        |> recycle()
+        |> get(path)
+        |> html_response(200)
+
+      assert response =~ marker
+    end
+  end
+
+  test "demo pages render unique DOM ids for stable Datastar patch targets", %{conn: conn} do
+    for {path, _marker} <- demo_pages() do
+      response =
+        conn
+        |> recycle()
+        |> get(path)
+        |> html_response(200)
+
+      ids = Regex.scan(~r/id="([^"]+)"/, response, capture: :all_but_first) |> List.flatten()
+      duplicate_ids = ids -- Enum.uniq(ids)
+
+      assert duplicate_ids == [],
+             "#{path} has duplicate ids: #{inspect(Enum.uniq(duplicate_ids))}"
+    end
+  end
+
+  test "command validation ready event patches validation UI", %{conn: conn} do
+    conn =
+      post_event(conn, ~p"/commands", "ready", %{
+        "email" => "ada@example.com",
+        "first_name" => "Ada",
+        "last_name" => "Lovelace"
+      })
+
+    conn
+    |> assert_patched_signals(%{intent: "ready"})
+    |> assert_patched_element("#validation-panel")
+  end
+
+  test "active search event patches only result panel", %{conn: conn} do
+    conn = post_event(conn, ~p"/search", "search", %{"query" => "stream", "segment" => "all"})
+
+    assert_patched_element(conn, "#search-results")
+    assert sse_body(conn) =~ "Northstar Metrics"
+    refute sse_body(conn) =~ "selector #search-query"
+
+    # Echoing query/segment back would clobber whatever the user typed
+    # while the response was in flight — the client owns those signals.
+    refute sse_body(conn) =~ "datastar-patch-signals"
+  end
+
+  test "GET /search drives the pending banner from a client-local indicator", %{conn: conn} do
+    response = conn |> get(~p"/search") |> html_response(200)
+
+    assert response =~ ~s[data-indicator="_searchPending"]
+    assert response =~ ~s[data-show="$_searchPending"]
+    refute response =~ "$searchPending = true"
+  end
+
+  test "streaming page stream emits bounded dashboard stream", %{conn: conn} do
+    conn = post_json(conn, ~p"/streaming", %{"tabId" => "test-tab"})
+
+    assert_patched_signals(conn, %{streamStatus: "complete", progress: 100})
+    assert sse_body(conn) =~ "selector #activity-log"
+    assert sse_body(conn) =~ "mode prepend"
+  end
+
+  @tag timeout: 5_000
+  test "streaming stream unregisters its tab key when the client drops mid-stream", %{
+    conn: conn
+  } do
+    tab_id = "stream-error-tab"
+    signals = %{"tabId" => tab_id}
+
+    conn = %{
+      conn
+      | method: "POST",
+        body_params: signals,
+        params: signals,
+        adapter: {DstarDemoWeb.ClosingSSEAdapter, %{chunks_left: 2}}
+    }
+
+    assert %Plug.Conn{state: :chunked} =
+             Dstar.Page.Plug.call(
+               conn,
+               Dstar.Page.Plug.init({:stream, DstarDemoWeb.StreamingDashboardPage})
+             )
+
+    assert Registry.lookup(
+             Dstar.Utility.StreamRegistry,
+             {{:dstar_demo, :streaming_dashboard}, tab_id}
+           ) == []
+  end
+
+  test "streaming stream unregisters its tab key on graceful completion", %{conn: conn} do
+    conn = post_json(conn, ~p"/streaming", %{"tabId" => "stream-complete-tab"})
+
+    assert_patched_signals(conn, %{streamStatus: "complete"})
+
+    # The registered process (this test process, under keep-alive: the
+    # connection process) outlives the completed stream; a stale entry
+    # would let the next connect kill it mid-unrelated-request.
+    assert Registry.lookup(
+             Dstar.Utility.StreamRegistry,
+             {{:dstar_demo, :streaming_dashboard}, "stream-complete-tab"}
+           ) == []
+  end
+
+  test "patch lab events exercise every Datastar patch mode", %{conn: conn} do
+    # outer is Datastar's default patch mode; dstar omits its mode line.
+    cases = [
+      {"outer", nil, "#lab-target", "Outer patch replaced this node"},
+      {"inner", "mode inner", "#lab-target", "Inner patch 1"},
+      {"append", "mode append", "#patch-list", "append patch #1"},
+      {"prepend", "mode prepend", "#patch-list", "prepend patch #1"},
+      {"before", "mode before", "#anchor-row", "before patch #1"},
+      {"after", "mode after", "#anchor-row", "after patch #1"},
+      {"remove", "mode remove", "#removable-note", nil}
+    ]
+
+    for {mode, mode_line, selector, marker} <- cases do
+      event_conn =
+        conn
+        |> recycle()
+        |> post_event(~p"/patch-lab", mode, %{"patch_count" => 0})
+
+      body = sse_body(event_conn)
+      if mode_line, do: assert(body =~ mode_line, "#{mode}: expected #{mode_line} in SSE body")
+      assert body =~ "selector #{selector}", "#{mode}: expected selector #{selector}"
+      if marker, do: assert(body =~ marker)
+      assert_patched_signals(event_conn, %{selected_mode: mode, patch_count: 1})
+    end
+  end
+
+  test "component stage events dispatch every kind to the Dstar.Component", %{conn: conn} do
+    encoded = Dstar.Actions.encode_module(DstarDemoWeb.ComponentStage)
+
+    for {kind, marker} <- [
+          {"profile", "Ada Lovelace"},
+          {"timeline", "Patch timeline"},
+          {"deploy", "Deploy summary"}
+        ] do
+      event_conn =
+        conn
+        |> recycle()
+        |> post_json("/ds/#{encoded}/#{kind}", %{"render_count" => 0})
+
+      event_conn
+      |> assert_patched_signals(%{component_kind: kind, render_count: 1})
+      |> assert_patched_element("#component-stage")
+
+      assert sse_body(event_conn) =~ marker
+    end
+  end
+
+  test "command validate event reports field errors and editing intent", %{conn: conn} do
+    conn =
+      post_event(conn, ~p"/commands", "validate", %{
+        "email" => "nope",
+        "first_name" => "Ada",
+        "last_name" => "L"
+      })
+
+    assert_patched_signals(conn, %{intent: "editing"})
+    assert sse_body(conn) =~ "Email needs an @"
+    assert sse_body(conn) =~ "Use at least 2 characters"
+  end
+
+  test "command ready event blocks when validation fails", %{conn: conn} do
+    conn =
+      post_event(conn, ~p"/commands", "ready", %{
+        "email" => "nope",
+        "first_name" => "",
+        "last_name" => ""
+      })
+
+    assert_patched_signals(conn, %{intent: "blocked"})
+  end
+
+  test "command reset event clears inputs and validation", %{conn: conn} do
+    conn =
+      post_event(conn, ~p"/commands", "reset", %{
+        "email" => "ada@example.com",
+        "first_name" => "Ada",
+        "last_name" => "Lovelace"
+      })
+
+    assert_patched_signals(conn, %{email: "", first_name: "", last_name: "", intent: "editing"})
+  end
+
+  test "signals read event snapshots incoming signals into the inspector", %{conn: conn} do
+    conn = post_event(conn, ~p"/signals", "read", %{"scope" => "beta", "server_tick" => 7})
+
+    assert_patched_signals(conn, %{
+      scope: "beta",
+      server_tick: 7,
+      audit_trail: "signals from handle_event/3"
+    })
+
+    assert_patched_element(conn, "#signals-inspector")
+  end
+
+  test "signals inspector can patch and remove signals", %{conn: conn} do
+    patch_conn = post_event(conn, ~p"/signals", "patch", %{"server_tick" => 0})
+
+    assert_patched_signals(patch_conn, %{
+      server_tick: 1,
+      audit_trail: "patch_signals tick 1"
+    })
+
+    remove_conn =
+      conn
+      |> recycle()
+      |> post_event(~p"/signals", "remove", %{"ephemeral" => "client-note"})
+
+    assert sse_body(remove_conn) =~ ~s("ephemeral":null)
+    assert_patched_signals(remove_conn, %{audit_trail: "remove_signals ephemeral"})
+  end
+
+  test "GET /components binds the stage header and variant buttons to signals", %{conn: conn} do
+    response = conn |> get(~p"/components") |> html_response(200)
+
+    # Without these bindings the render counter, kind pill, and button
+    # highlight are one-shot server renders that go stale after the first
+    # component event.
+    assert response =~ ~s[data-text="$render_count"]
+    assert response =~ ~s[data-text="$component_kind"]
+    assert response =~ ~s[$component_kind === &#39;profile&#39;]
+  end
+
+  test "GET /patch-lab binds the header and mode buttons to signals", %{conn: conn} do
+    response = conn |> get(~p"/patch-lab") |> html_response(200)
+
+    assert response =~ ~s[data-text="$patch_count"]
+    assert response =~ ~s[data-text="$selected_mode"]
+    assert response =~ ~s[$selected_mode === &#39;outer&#39;]
+  end
+
+  test "signals inspector snapshot does not re-embed itself", %{conn: conn} do
+    conn =
+      post_event(conn, ~p"/signals", "read", %{
+        "server_tick" => 3,
+        "last_read" => %{"previous" => "snapshot"}
+      })
+
+    # Round-tripping last_read inside itself nests one level per click.
+    refute sse_body(conn) =~ "previous"
+  end
+
+  test "script helpers emit console script", %{conn: conn} do
+    conn = post_event(conn, ~p"/scripts", "console", %{"script_runs" => 0})
+
+    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "console_log"})
+    assert sse_body(conn) =~ "console.info"
+    assert sse_body(conn) =~ ~s(data-demo-script="console")
+    refute sse_body(conn) =~ "data-effect"
+    refute sse_body(conn) =~ "selector #script-log"
+  end
+
+  # execute_script and redirect are the exact surfaces the dstar 0.1.2/0.1.3
+  # security releases changed — keep regression coverage on their output.
+  test "script helpers emit execute script with its marker attribute", %{conn: conn} do
+    conn = post_event(conn, ~p"/scripts", "execute", %{"script_runs" => 0})
+
+    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "execute_script"})
+    assert sse_body(conn) =~ "dstarScriptPulse"
+    assert sse_body(conn) =~ ~s(data-demo-script="execute")
+  end
+
+  test "script helpers emit redirect script", %{conn: conn} do
+    conn = post_event(conn, ~p"/scripts", "redirect", %{"script_runs" => 0})
+
+    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "redirect"})
+    assert sse_body(conn) =~ "/scripts?redirected=1"
+    assert sse_body(conn) =~ ~s(data-demo-script="redirect")
+  end
+
+  defp demo_pages do
+    [
+      {~p"/commands", "Validation is a command"},
+      {~p"/search", "Active search"},
+      {~p"/streaming", "Streaming dashboard"},
+      {~p"/patch-lab", "Patch lab"},
+      {~p"/components", "Server-rendered components"},
+      {~p"/signals", "Signals lifecycle"},
+      {~p"/scripts", "Script helpers"}
+    ]
+  end
+
+  defp post_event(conn, page_path, event, signals) do
+    post_json(conn, page_path <> "/_event/" <> event, signals)
+  end
+
+  defp post_json(conn, path, signals) do
+    conn = Plug.Test.init_test_session(conn, %{})
+    csrf = Plug.CSRFProtection.get_csrf_token()
+
+    conn
+    |> put_req_header("content-type", "application/json")
+    |> post(path, Jason.encode!(Map.put(signals, "csrf", csrf)))
+  end
+
+  defp sse_body(conn) do
+    assert conn.state == :chunked
+    conn.resp_body
+  end
+end

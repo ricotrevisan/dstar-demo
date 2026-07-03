@@ -1,74 +1,156 @@
-defmodule DstarDemoWeb.PresenceController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.PresencePage do
+  use DstarDemoWeb, :dstar_page
 
   alias DstarDemoWeb.Presence
 
   @topic "presence:lobby"
+  @stream_scope {:dstar_demo, :presence}
   @colors ~w(emerald sky violet amber rose cyan lime fuchsia)
   @animals ~w(Otter Finch Lynx Panda Moth Heron Gecko Raven)
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, _params) do
     visitor = visitor_for(get_session(conn, :presence_seed) || random_seed())
 
     conn
     |> put_session(:presence_seed, visitor.seed)
-    |> signal(:visitorName, visitor.name)
-    |> signal(:visitorColor, visitor.color)
-    |> signal(:presenceStatus, "connecting")
+    |> assign(:visitorName, visitor.name)
+    |> assign(:visitorColor, visitor.color)
+    |> assign(:presenceInstance, random_seed())
+    |> assign(:presenceStatus, "connecting")
   end
 
-  def home(conn, _params), do: conn
+  # POST /presence — Dstar.Page.Plug opens the SSE stream (deduplicated per
+  # tab via stream_key/1) and owns the receive loop behind handle_info/2.
+  @impl Dstar.Page
+  def stream_key(_conn), do: @stream_scope
 
-  def join(conn, _params) do
-    conn = normalize_tab_id(conn)
+  @impl Dstar.Page
+  def handle_connect(conn, _params) do
     signals = read_signals(conn)
-    tab_id = Map.get(signals, "tabId") || random_seed()
-    visitor = visitor_for(Map.get(signals, "visitorName") || tab_id)
+    # Dstar.start_stream registered this stream under the RAW tabId signal;
+    # registry operations must use that exact key or they silently miss it.
+    registry_tab = signals["tabId"]
+    tab_id = sanitize_token(registry_tab) || random_seed()
+    presence_instance = sanitize_token(signals["presenceInstance"]) || random_seed()
+    name = sanitize_name(signals["visitorName"])
+    visitor = visitor_for(name || tab_id)
+    name = name || visitor.name
+    color = sanitize_color(signals["visitorColor"]) || visitor.color
 
     Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
-    conn = Dstar.start_stream(conn, {:dstar_demo, :presence})
+    remember_presence_instance(registry_tab, presence_instance)
 
     {:ok, _} =
       Presence.track(self(), @topic, tab_id, %{
-        name: Map.get(signals, "visitorName") || visitor.name,
-        color: Map.get(signals, "visitorColor") || visitor.color,
+        name: name,
+        color: color,
         status: "active",
+        presence_instance: presence_instance,
         last_seen: System.system_time(:second)
       })
 
-    broadcast_activity(
-      "#{Map.get(signals, "visitorName") || visitor.name} joined the room",
-      "join"
-    )
+    broadcast_activity("#{name} joined the room", "join")
+
+    conn =
+      conn
+      |> assign(:tab_id, tab_id)
+      |> assign(:registry_tab, registry_tab)
+      |> assign(:presence_instance, presence_instance)
 
     case safe_presence_patch(conn, fn conn ->
            conn
-           |> signal(:presenceStatus, "live")
+           |> patch_signals(%{presenceStatus: "live"})
            |> patch_presence()
          end) do
-      {:ok, conn} -> presence_loop(conn)
-      {:closed, conn} -> conn
+      {:ok, conn} ->
+        conn
+
+      {:closed, conn} ->
+        # handle_connect cannot halt the loop directly; have handle_info do it.
+        send(self(), :client_gone)
+        conn
     end
   end
 
-  def ping(conn, _params) do
-    signals = read_signals(conn)
-    name = Map.get(signals, "visitorName", "Someone")
-    color = Map.get(signals, "visitorColor", "emerald")
+  @impl Dstar.Page
+  def handle_info(:client_gone, conn), do: {:halt, halt_cleanup(conn)}
+
+  # Dstar's StreamRegistry kills a replaced stream with Process.exit(pid,
+  # :replaced). Over HTTP/1.1, Bandit's connection process traps exits, so
+  # the kill arrives here as a message instead — halt gracefully rather
+  # than lingering as an unhandled-message zombie.
+  def handle_info({:EXIT, _pid, :replaced}, conn), do: {:halt, halt_cleanup(conn)}
+
+  def handle_info({:presence_leave, tab, presence_instance}, conn) do
+    if tab != nil and tab == conn.assigns[:registry_tab] and
+         presence_instance == conn.assigns.presence_instance do
+      {:halt, halt_cleanup(conn)}
+    else
+      conn
+    end
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: diff}, conn) do
+    {joins, leaves} = presence_diff_summary(diff)
+    message = "Presence changed: +#{joins} / -#{leaves}"
+
+    case safe_presence_patch(conn, fn conn ->
+           conn
+           |> patch_presence()
+           |> patch(&activity_row/1, [message: message, kind: "diff", color: "sky"],
+             selector: "#presence-activity",
+             mode: :prepend
+           )
+         end) do
+      {:ok, conn} -> conn
+      {:closed, conn} -> {:halt, halt_cleanup(conn)}
+    end
+  end
+
+  def handle_info(%Phoenix.Socket.Broadcast{event: "presence_activity", payload: payload}, conn) do
+    case safe_presence_patch(conn, fn conn ->
+           patch(conn, &activity_row/1, payload,
+             selector: "#presence-activity",
+             mode: :prepend
+           )
+         end) do
+      {:ok, conn} -> conn
+      {:closed, conn} -> {:halt, halt_cleanup(conn)}
+    end
+  end
+
+  @impl Dstar.Page
+  def handle_event(conn, "ping", signals) do
+    name = sanitize_name(signals["visitorName"]) || "Someone"
+    color = sanitize_color(signals["visitorColor"]) || "emerald"
 
     broadcast_activity("#{name} sent a room ping", "ping", color)
 
-    conn
-    |> Dstar.start()
-    |> Dstar.patch_elements(
-      activity_row(%{message: "Ping sent — other tabs will see it.", kind: "ping", color: color}),
+    patch(
+      conn,
+      &activity_row/1,
+      [message: "Ping sent — other tabs will see it.", kind: "ping", color: color],
       selector: "#presence-activity",
       mode: :prepend
     )
   end
 
-  @impl Dstar
+  # Sent by the pagehide beacon in app.js. The response body is never read
+  # by the browser, so the already-started SSE stream simply closes empty.
+  def handle_event(conn, "leave", signals) do
+    # Look up by the RAW tabId — it is the key the stream registered under.
+    registry_tab = signals["tabId"]
+    presence_instance = sanitize_token(signals["presenceInstance"])
+
+    if registry_tab && presence_instance do
+      notify_presence_stream(registry_tab, presence_instance)
+    end
+
+    conn
+  end
+
+  @impl Dstar.Page
   def render(assigns) do
     ~H"""
     <.demo_shell
@@ -76,12 +158,19 @@ defmodule DstarDemoWeb.PresenceController do
       title="Presence room"
       eyebrow="Realtime presence"
       summary="Open this page in multiple tabs to see visitors join, leave, and send collaborative room pings through Phoenix Presence and Dstar patches."
-      signals={init_signals(@conn)}
+      signals={
+        %{
+          visitorName: @visitorName,
+          visitorColor: @visitorColor,
+          presenceInstance: @presenceInstance,
+          presenceStatus: @presenceStatus
+        }
+      }
     >
       <:aside>
         <.demo_facts items={[
           "Phoenix Presence tracks each browser tab as a visitor.",
-          "A long-lived Dstar stream subscribes to presence diffs.",
+          "handle_connect/2 and handle_info/2 drive the room stream.",
           "Roster, online count, and activity are patched independently.",
           "The ping button broadcasts a tiny collaborative interaction."
         ]} />
@@ -89,8 +178,11 @@ defmodule DstarDemoWeb.PresenceController do
 
       <section
         id="presence-room"
-        data-init="@post('/presence/join', {retryMaxCount: Infinity})"
-        data-on:online__window="@post('/presence/join', {retryMaxCount: Infinity})"
+        data-init={room_connect()}
+        data-on:online__window={room_connect()}
+        data-on:pageshow__window={"evt.persisted && ($presenceInstance = crypto.randomUUID(), el.dataset.presenceInstance = $presenceInstance, #{room_connect()})"}
+        data-presence-leave-url={~p"/presence/_event/leave"}
+        data-presence-instance={@presenceInstance}
         class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"
       >
         <div class="grid gap-5">
@@ -108,7 +200,7 @@ defmodule DstarDemoWeb.PresenceController do
                 </div>
                 <button
                   id="presence-ping"
-                  data-on:click="@post('/presence/ping')"
+                  data-on:click={event("ping")}
                   class="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:-translate-y-0.5 hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
                 >
                   <.icon name="hero-sparkles-micro" class="size-4" /> Ping room
@@ -132,7 +224,9 @@ defmodule DstarDemoWeb.PresenceController do
               </span>
               <div>
                 <p class="font-semibold text-zinc-100">{@visitorName}</p>
-                <p class="text-sm text-zinc-500">status: {@presenceStatus}</p>
+                <p class="text-sm text-zinc-500">
+                  status: <span data-text="$presenceStatus">{@presenceStatus}</span>
+                </p>
               </div>
             </div>
           </div>
@@ -208,44 +302,6 @@ defmodule DstarDemoWeb.PresenceController do
     {count_metas(joins), count_metas(leaves)}
   end
 
-  defp presence_loop(conn) do
-    receive do
-      %Phoenix.Socket.Broadcast{event: "presence_diff", payload: diff} ->
-        {joins, leaves} = presence_diff_summary(diff)
-        message = "Presence changed: +#{joins} / -#{leaves}"
-
-        case safe_presence_patch(conn, fn conn ->
-               conn
-               |> patch_presence()
-               |> Dstar.patch_elements(
-                 activity_row(%{message: message, kind: "diff", color: "sky"}),
-                 selector: "#presence-activity",
-                 mode: :prepend
-               )
-             end) do
-          {:ok, conn} -> presence_loop(conn)
-          {:closed, conn} -> conn
-        end
-
-      %Phoenix.Socket.Broadcast{event: "presence_activity", payload: payload} ->
-        case safe_presence_patch(conn, fn conn ->
-               Dstar.patch_elements(conn, activity_row(payload),
-                 selector: "#presence-activity",
-                 mode: :prepend
-               )
-             end) do
-          {:ok, conn} -> presence_loop(conn)
-          {:closed, conn} -> conn
-        end
-    after
-      30_000 ->
-        case Dstar.check_connection(conn) do
-          {:ok, conn} -> presence_loop(conn)
-          {:error, conn} -> conn
-        end
-    end
-  end
-
   defp patch_presence(conn) do
     users =
       @topic
@@ -253,7 +309,7 @@ defmodule DstarDemoWeb.PresenceController do
       |> Enum.map(fn {_key, %{metas: [meta | _]}} -> meta end)
       |> Enum.sort_by(& &1.name)
 
-    Dstar.patch_elements(conn, presence_board(%{users: users}), selector: "#presence-board")
+    patch(conn, &presence_board/1, [users: users], selector: "#presence-board")
   end
 
   defp safe_presence_patch(conn, patch_fun) when is_function(patch_fun, 1) do
@@ -275,29 +331,69 @@ defmodule DstarDemoWeb.PresenceController do
     })
   end
 
-  defp read_signals(conn) do
-    case Dstar.read_signals_result(conn) do
-      {:ok, signals} when is_map(signals) -> signals
-      _ -> %{}
+  # No client auto-retry: duplicated tabs share the sessionStorage tabId,
+  # and a killed-and-retried stream re-kills its sibling forever — the
+  # client resets its retry counter on every 200, so any finite budget is
+  # ineffective against the replace-kill loop. data-on:online__window and
+  # the pageshow handler reconnect when it actually matters.
+  defp room_connect, do: connect(opts: "{retryMaxCount: 0}")
+
+  # A halted stream's process can outlive the stream (Bandit keep-alive
+  # reuses the connection process), so everything scoped to this stream —
+  # presence entry, topic subscription, registry key — must go with it.
+  defp halt_cleanup(conn) do
+    if tab_id = conn.assigns[:tab_id] do
+      Presence.untrack(self(), @topic, tab_id)
+    end
+
+    if registry_tab = conn.assigns[:registry_tab] do
+      Registry.unregister(Dstar.Utility.StreamRegistry, {@stream_scope, registry_tab})
+    end
+
+    Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, @topic)
+    conn
+  end
+
+  defp remember_presence_instance(nil, _presence_instance), do: :ok
+
+  defp remember_presence_instance(registry_tab, presence_instance) do
+    Registry.update_value(
+      Dstar.Utility.StreamRegistry,
+      {@stream_scope, registry_tab},
+      fn _value -> presence_instance end
+    )
+
+    :ok
+  end
+
+  defp notify_presence_stream(registry_tab, presence_instance) do
+    Dstar.Utility.StreamRegistry
+    |> Registry.lookup({@stream_scope, registry_tab})
+    |> Enum.each(fn
+      {pid, ^presence_instance} -> send(pid, {:presence_leave, registry_tab, presence_instance})
+      _stale_or_missing_instance -> :ok
+    end)
+  end
+
+  # Signals are client-controlled: reject non-strings and cap lengths so a
+  # forged request can't impersonate with arbitrary markup-length strings or
+  # park megabytes in Presence metas that rebroadcast to every viewer.
+  defp sanitize_name(value) when is_binary(value) do
+    case String.trim(value) do
+      "" -> nil
+      trimmed -> String.slice(trimmed, 0, 40)
     end
   end
 
-  defp normalize_tab_id(%Plug.Conn{body_params: body_params, params: params} = conn)
-       when is_map(body_params) do
-    case {body_params["tabId"], body_params["tabid"]} do
-      {nil, tab_id} when is_binary(tab_id) ->
-        %{
-          conn
-          | body_params: Map.put(body_params, "tabId", tab_id),
-            params: Map.put(params, "tabId", tab_id)
-        }
+  defp sanitize_name(_), do: nil
 
-      _ ->
-        conn
-    end
-  end
+  defp sanitize_token(value) when is_binary(value) and value != "",
+    do: String.slice(value, 0, 64)
 
-  defp normalize_tab_id(conn), do: conn
+  defp sanitize_token(_), do: nil
+
+  defp sanitize_color(value) when value in @colors, do: value
+  defp sanitize_color(_), do: nil
 
   defp visitor_for(seed) do
     index = :erlang.phash2(seed, length(@animals))

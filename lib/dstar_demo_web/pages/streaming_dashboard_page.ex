@@ -1,33 +1,104 @@
-defmodule DstarDemoWeb.StreamingDashboardController do
-  use DstarDemoWeb, :dstar
+defmodule DstarDemoWeb.StreamingDashboardPage do
+  use DstarDemoWeb, :dstar_page
 
   @stream_steps 8
   @stream_delay if Mix.env() == :test, do: 0, else: 280
 
-  @impl Dstar
+  @impl Dstar.Page
   def mount(conn, _params) do
-    conn
-    |> signal(:streamStatus, "idle")
-    |> signal(:tick, 0)
-    |> signal(:throughput, 118)
-    |> signal(:latency, 42)
-    |> signal(:progress, 0)
+    assign(conn,
+      streamStatus: "idle",
+      tick: 0,
+      throughput: 118,
+      latency: 42,
+      progress: 0
+    )
   end
 
-  def home(conn, _params), do: conn
+  # POST /streaming — Dstar.Page.Plug opens the SSE stream (deduplicated
+  # per tab via stream_key/1) and then owns the receive loop.
+  @impl Dstar.Page
+  def stream_key(_conn), do: {:dstar_demo, :streaming_dashboard}
 
-  def stream(conn, _params) do
+  @impl Dstar.Page
+  def handle_connect(conn, _params) do
+    Process.send_after(self(), {:tick, 1}, @stream_delay)
+
+    conn
+    |> assign(:tab_id, read_signals(conn)["tabId"])
+    |> patch_signals(%{streamStatus: "live", progress: 0, tick: 0})
+    |> patch(&stream_frame/1, [tick: 0, status: "live"], selector: "#stream-frame")
+  end
+
+  @impl Dstar.Page
+  def handle_info({:tick, tick}, conn) when tick <= @stream_steps do
+    case check_connection(conn) do
+      {:ok, conn} ->
+        throughput = 118 + tick * 9 + rem(tick, 3) * 4
+        latency = 42 - min(tick * 2, 18)
+        progress = trunc(tick / @stream_steps * 100)
+
+        Process.send_after(self(), {:tick, tick + 1}, @stream_delay)
+
+        conn
+        |> patch_signals(%{
+          tick: tick,
+          throughput: throughput,
+          latency: latency,
+          progress: progress,
+          streamStatus: "live"
+        })
+        |> patch(&metric_tile/1,
+          id: "metric-throughput",
+          title: "Throughput",
+          value: "#{throughput}/min",
+          detail: "ingested events",
+          tone: "good"
+        )
+        |> patch(&metric_tile/1,
+          id: "metric-latency",
+          title: "Latency",
+          value: "#{latency} ms",
+          detail: "edge to patch",
+          tone: "info"
+        )
+        |> patch(&metric_tile/1,
+          id: "metric-progress",
+          title: "Progress",
+          value: "#{progress}%",
+          detail: "stream live",
+          tone: "warn"
+        )
+        |> patch(&activity_row/1, [tick: tick], selector: "#activity-log", mode: :prepend)
+
+      {:error, conn} ->
+        {:halt, unregister_stream(conn)}
+    end
+  end
+
+  def handle_info({:tick, _done}, conn) do
     conn =
       conn
-      |> normalize_tab_id()
-      |> Dstar.start_stream({:dstar_demo, :streaming_dashboard})
-      |> Dstar.patch_signals(%{streamStatus: "live", progress: 0, tick: 0})
-      |> Dstar.patch_elements(stream_frame(%{tick: 0, status: "live"}), selector: "#stream-frame")
+      |> patch_signals(%{streamStatus: "complete", progress: 100})
+      |> patch(&stream_frame/1, [tick: @stream_steps, status: "complete"],
+        selector: "#stream-frame"
+      )
 
-    stream_loop(conn, 1)
+    {:halt, unregister_stream(conn)}
   end
 
-  @impl Dstar
+  # The connection process outlives the completed stream under keep-alive;
+  # a stale registry entry would let the next connect for this tab kill it
+  # while it serves an unrelated request.
+  defp unregister_stream(conn) do
+    if tab_id = conn.assigns[:tab_id] do
+      Registry.unregister(Dstar.Utility.StreamRegistry, {stream_key(conn), tab_id})
+    end
+
+    conn
+  end
+
+  @impl Dstar.Page
   def render(assigns) do
     ~H"""
     <.demo_shell
@@ -35,20 +106,28 @@ defmodule DstarDemoWeb.StreamingDashboardController do
       title="Streaming dashboard"
       eyebrow="SSE stream"
       summary="A bounded SSE loop sends live metrics and activity patches. Starting it again in the same tab replaces the prior stream."
-      signals={init_signals(@conn)}
+      signals={
+        %{
+          streamStatus: @streamStatus,
+          tick: @tick,
+          throughput: @throughput,
+          latency: @latency,
+          progress: @progress
+        }
+      }
     >
       <:aside>
         <.demo_facts items={[
-          "The stream action calls Dstar.start_stream/2.",
-          "StreamRegistry deduplicates by demo scope plus tabId.",
-          "The loop is bounded and checks the SSE connection.",
+          "connect/1 posts to the page path and opens the stream.",
+          "stream_key/1 deduplicates by demo scope plus tabId.",
+          "handle_info/2 receives ticks from the library-owned loop.",
           "Metric tiles and activity rows are patched independently."
         ]} />
       </:aside>
 
       <section
         id="stream-dashboard"
-        data-on:online__window="@post('/streaming/stream', {retryMaxCount: 0})"
+        data-on:online__window={connect(opts: "{retryMaxCount: 0}")}
         class="grid gap-5"
       >
         <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
@@ -60,7 +139,7 @@ defmodule DstarDemoWeb.StreamingDashboardController do
           </div>
           <button
             id="start-stream"
-            data-on:click="@post('/streaming/stream', {retryMaxCount: 0})"
+            data-on:click={connect(opts: "{retryMaxCount: 0}")}
             class="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
           >
             <.icon name="hero-play-micro" class="size-4" /> Start stream
@@ -122,7 +201,7 @@ defmodule DstarDemoWeb.StreamingDashboardController do
           Deduplication
         </p>
         <p class="mt-3 text-sm leading-6 text-zinc-400">
-          The body exposes a per-tab signal named tabId. Dstar.start_stream/2 registers this
+          The body exposes a per-tab signal named tabId. stream_key/1 registers this
           connection and replaces any older stream for the same tab.
         </p>
       </aside>
@@ -156,89 +235,4 @@ defmodule DstarDemoWeb.StreamingDashboardController do
     </div>
     """
   end
-
-  defp stream_loop(conn, tick) when tick <= @stream_steps do
-    case Dstar.check_connection(conn) do
-      {:ok, conn} ->
-        if @stream_delay > 0, do: Process.sleep(@stream_delay)
-
-        throughput = 118 + tick * 9 + rem(tick, 3) * 4
-        latency = 42 - min(tick * 2, 18)
-        progress = trunc(tick / @stream_steps * 100)
-
-        conn =
-          conn
-          |> Dstar.patch_signals(%{
-            tick: tick,
-            throughput: throughput,
-            latency: latency,
-            progress: progress,
-            streamStatus: "live"
-          })
-          |> Dstar.patch_elements(
-            metric_tile(%{
-              id: "metric-throughput",
-              title: "Throughput",
-              value: "#{throughput}/min",
-              detail: "ingested events",
-              tone: "good"
-            }),
-            []
-          )
-          |> Dstar.patch_elements(
-            metric_tile(%{
-              id: "metric-latency",
-              title: "Latency",
-              value: "#{latency} ms",
-              detail: "edge to patch",
-              tone: "info"
-            }),
-            []
-          )
-          |> Dstar.patch_elements(
-            metric_tile(%{
-              id: "metric-progress",
-              title: "Progress",
-              value: "#{progress}%",
-              detail: "stream live",
-              tone: "warn"
-            }),
-            []
-          )
-          |> Dstar.patch_elements(activity_row(%{tick: tick}),
-            selector: "#activity-log",
-            mode: :prepend
-          )
-
-        stream_loop(conn, tick + 1)
-
-      {:error, conn} ->
-        conn
-    end
-  end
-
-  defp stream_loop(conn, _tick) do
-    conn
-    |> Dstar.patch_signals(%{streamStatus: "complete", progress: 100})
-    |> Dstar.patch_elements(stream_frame(%{tick: @stream_steps, status: "complete"}),
-      selector: "#stream-frame"
-    )
-  end
-
-  defp normalize_tab_id(%Plug.Conn{body_params: body_params, params: params} = conn)
-       when is_map(body_params) do
-    case {body_params["tabId"], body_params["tabid"]} do
-      {nil, tab_id} when is_binary(tab_id) ->
-        %{
-          conn
-          | body_params: Map.put(body_params, "tabId", tab_id),
-            params: Map.put(params, "tabId", tab_id)
-        }
-
-      _ ->
-        conn
-    end
-  end
-
-  defp normalize_tab_id(conn), do: conn
 end
