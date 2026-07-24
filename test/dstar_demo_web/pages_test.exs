@@ -26,20 +26,28 @@ defmodule DstarDemoWeb.PagesTest do
     conn = get(conn, ~p"/commands")
 
     response = html_response(conn, 200)
-    assert response =~ "Validation is a command"
-    assert response =~ "data-bind:email"
-    assert response =~ "use Dstar.Page"
-    refute response =~ "<form"
-  end
+    assert response =~ "Form data validation"
+    assert response =~ ~s[id="access-pass-form"]
+    assert response =~ ~s[novalidate]
+    assert response =~ ~s[name="_csrf_token"]
+    assert response =~ ~s[name="email"]
+    assert response =~ ~s[type="email"]
+    assert response =~ ~s[required]
+    refute response =~ "data-bind:email"
+    refute response =~ "data-on-signal-patch"
 
-  test "GET /commands scopes signal-patch revalidation to the bound input signals", %{conn: conn} do
-    response = conn |> get(~p"/commands") |> html_response(200)
+    document = LazyHTML.from_document(response)
+    form = LazyHTML.query(document, "#access-pass-form")
+    email_input = LazyHTML.query(document, "#access-pass-email-input")
+    first_name_input = LazyHTML.query(document, "#access-pass-first_name-input")
 
-    # Without the filter, the server's own validation/intent signal patches
-    # echo back into data-on-signal-patch and re-fire "validate", reverting
-    # the Ready state ~300ms after every click.
-    assert response =~ "data-on-signal-patch-filter"
-    assert response =~ "^(email|first_name|last_name)$"
+    [submit_action] = LazyHTML.attribute(form, "data-on:submit")
+    assert submit_action =~ "/_event/validate"
+    assert submit_action =~ "contentType: 'form'"
+
+    assert LazyHTML.attribute(form, "novalidate") == [""]
+    assert LazyHTML.attribute(email_input, "required") == [""]
+    assert LazyHTML.attribute(first_name_input, "minlength") == ["2"]
   end
 
   test "GET demo pages", %{conn: conn} do
@@ -70,17 +78,24 @@ defmodule DstarDemoWeb.PagesTest do
     end
   end
 
-  test "command validation ready event patches validation UI", %{conn: conn} do
+  test "form validation submit accepts company email", %{conn: conn} do
     conn =
-      post_event(conn, ~p"/commands", "ready", %{
+      post_form_event(conn, ~p"/commands", "validate", %{
         "email" => "ada@example.com",
         "first_name" => "Ada",
         "last_name" => "Lovelace"
       })
 
     conn
-    |> assert_patched_signals(%{intent: "ready"})
+    |> assert_patched_element("#form-status")
+    |> assert_patched_element("#access-pass-email-feedback")
+    |> assert_patched_element("#access-pass-first_name-feedback")
+    |> assert_patched_element("#access-pass-last_name-feedback")
     |> assert_patched_element("#validation-panel")
+    |> assert_patched_element("#form-payload")
+
+    assert sse_body(conn) =~ "accepted"
+    refute sse_body(conn) =~ "datastar-patch-signals"
   end
 
   test "active search event patches only result panel", %{conn: conn} do
@@ -199,31 +214,28 @@ defmodule DstarDemoWeb.PagesTest do
     end
   end
 
-  test "command validate event reports field errors and editing intent", %{conn: conn} do
+  test "form validation submit reports server errors", %{conn: conn} do
     conn =
-      post_event(conn, ~p"/commands", "validate", %{
-        "email" => "nope",
+      post_form_event(conn, ~p"/commands", "validate", %{
+        "email" => "ada@personal.test",
         "first_name" => "Ada",
         "last_name" => "L"
       })
 
-    assert_patched_signals(conn, %{intent: "editing"})
-    assert sse_body(conn) =~ "Email needs an @"
+    conn
+    |> assert_patched_element("#form-status")
+    |> assert_patched_element("#access-pass-email-feedback")
+    |> assert_patched_element("#access-pass-first_name-feedback")
+    |> assert_patched_element("#access-pass-last_name-feedback")
+    |> assert_patched_element("#validation-panel")
+    |> assert_patched_element("#form-payload")
+
+    assert sse_body(conn) =~ "server rejected"
+    assert sse_body(conn) =~ "Use an @example.com email"
     assert sse_body(conn) =~ "Use at least 2 characters"
   end
 
-  test "command ready event blocks when validation fails", %{conn: conn} do
-    conn =
-      post_event(conn, ~p"/commands", "ready", %{
-        "email" => "nope",
-        "first_name" => "",
-        "last_name" => ""
-      })
-
-    assert_patched_signals(conn, %{intent: "blocked"})
-  end
-
-  test "command reset event clears inputs and validation", %{conn: conn} do
+  test "form reset event clears validation feedback", %{conn: conn} do
     conn =
       post_event(conn, ~p"/commands", "reset", %{
         "email" => "ada@example.com",
@@ -231,7 +243,17 @@ defmodule DstarDemoWeb.PagesTest do
         "last_name" => "Lovelace"
       })
 
-    assert_patched_signals(conn, %{email: "", first_name: "", last_name: "", intent: "editing"})
+    conn
+    |> assert_patched_element("#form-status")
+    |> assert_patched_element("#access-pass-email-feedback")
+    |> assert_patched_element("#access-pass-first_name-feedback")
+    |> assert_patched_element("#access-pass-last_name-feedback")
+    |> assert_patched_element("#validation-panel")
+    |> assert_patched_element("#form-payload")
+
+    assert sse_body(conn) =~ "not submitted"
+    assert sse_body(conn) =~ "Server feedback appears here"
+    assert sse_body(conn) =~ "No form data has reached the server yet"
   end
 
   test "signals read event snapshots incoming signals into the inspector", %{conn: conn} do
@@ -323,7 +345,7 @@ defmodule DstarDemoWeb.PagesTest do
 
   defp demo_pages do
     [
-      {~p"/commands", "Validation is a command"},
+      {~p"/commands", "Form data validation"},
       {~p"/search", "Active search"},
       {~p"/streaming", "Streaming dashboard"},
       {~p"/patch-lab", "Patch lab"},
@@ -335,6 +357,13 @@ defmodule DstarDemoWeb.PagesTest do
 
   defp post_event(conn, page_path, event, signals) do
     post_json(conn, page_path <> "/_event/" <> event, signals)
+  end
+
+  defp post_form_event(conn, page_path, event, params) do
+    conn = Plug.Test.init_test_session(conn, %{})
+    csrf = Plug.CSRFProtection.get_csrf_token()
+
+    post(conn, page_path <> "/_event/" <> event, Map.put(params, "_csrf_token", csrf))
   end
 
   defp post_json(conn, path, signals) do

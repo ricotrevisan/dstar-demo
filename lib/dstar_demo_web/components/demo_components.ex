@@ -11,7 +11,7 @@ defmodule DstarDemoWeb.DemoComponents do
     statics: DstarDemoWeb.static_paths()
 
   @demos [
-    {"Command Validation", "/commands", "hero-command-line-micro"},
+    {"Form Validation", "/commands", "hero-clipboard-document-check-micro"},
     {"Active Search", "/search", "hero-magnifying-glass-micro"},
     {"Streaming Dashboard", "/streaming", "hero-signal-micro"},
     {"Patch Lab", "/patch-lab", "hero-squares-plus-micro"},

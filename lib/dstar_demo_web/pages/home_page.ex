@@ -34,11 +34,11 @@ defmodule DstarDemoWeb.HomePage do
 
           <section id="map" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             <.demo_tile
-              title="Command Validation"
+              title="Form Validation"
               status="ready"
               href={~p"/commands"}
-              icon="hero-command-line"
-              body="Bound inputs, validate and ready commands, no form element."
+              icon="hero-clipboard-document-check"
+              body="A native form submits fields with contentType: 'form' and patches feedback only."
             />
             <.demo_tile
               title="Active Search"
