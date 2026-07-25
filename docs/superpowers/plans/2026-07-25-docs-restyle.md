@@ -14,7 +14,7 @@
 - **Accent accessibility:** `#e8590c` on white is **3.58:1** — AA for large text (≥3:1) and UI components, **fails** the 4.5:1 for normal body text. In light mode the orange is for rules, active states, borders, the logo and large text **only** — never small body copy, never inline links inside a paragraph. If orange is later wanted in running prose, darken to `#c2410c` (~5.9:1).
 - **Text measure:** prose capped at `68ch`; demo and code panes span the full content column. Content column capped at **1100px**. Sidebar **240px**.
 - **Typography:** system stacks only. Sans is Tailwind's default `font-sans` — **do not override it**. Mono is `ui-monospace` and friends. No `@font-face`, nothing added to `priv/static/fonts/`.
-- **DaisyUI usage:** theme tokens plus `btn`, `badge`, `kbd`, `tabs` only. Everything structural — sidebar, panels, code blocks, the comparison grid — stays hand-written Tailwind utilities.
+- **DaisyUI usage:** theme tokens plus `btn`, `badge`, `kbd`, `tabs` only. Everything structural — sidebar, panels, code blocks, the comparison grid — stays hand-written Tailwind utilities. Note that DaisyUI component CSS is **usage-gated**: Tailwind 4 prunes any component class no scanned source references, so these four are only available if something actually uses them. Never assert their presence in a test.
 - **No JavaScript is added.** The sub-`lg` nav is a `<details>` disclosure, not a drawer. Highlighting is server-side.
 - **`eyebrow` is dropped** from `demo_shell`. The `:aside` slot is dropped but its content is not: each page's existing `demo_facts` bullets become a `key_points` list leading **How it works**, same words.
 - **Fairness rules for every comparison (requirements, not guidance):** (1) **Like for like** — both sides solve the same problem with the same features; no dropping the debounce on one side. (2) **No strawmen** — idiomatic LiveView as a competent LiveView developer would write it. (3) **Concede where LiveView wins** — the `<:note>` must say what LiveView does better wherever that is true.
@@ -30,9 +30,10 @@ These were checked against the code and the published packages while writing thi
 2. **Name the two themes `light` and `dark`.** `assets/js/app.js:29-46` already implements the toggle by setting `data-theme="light"|"dark"` on `<html>`, and DaisyUI's theme plugin keys its selector off `[data-theme="<name>"]`. Any other names leave the existing toggle dead. A bonus: the plugin merges DaisyUI's built-in `light`/`dark` token sets under those names (`assets/vendor/daisyui-theme.js:74-81`), so the five overridden tokens sit on top of sane defaults for `success`/`warning`/`error`.
 3. **Makeup needs four dependencies, not one.** `makeup_eex`'s HEEx lexer raises at runtime without an HTML lexer registered. The required set is `makeup ~> 1.2`, `makeup_elixir ~> 1.0`, `makeup_eex ~> 2.0`, `makeup_html ~> 0.2`. Note the version: `makeup_eex`'s own error message suggests `makeup_html ~> 1.0`, which does not exist — the latest release is `0.2.0`.
 4. **`code_block` takes the code as an attr, not a slot.** The spec sketches `<.code_block language="elixir">…</.code_block>`, but a slot's content arrives as rendered HTML, which cannot be handed to a lexer as source text — and the verbatim-drift test needs the exact string. Use `<.code_block language="elixir" code={…} />`.
-5. **`pages_test.exs` needs no repair.** The spec's Testing and Risks sections expect churn in the page-render assertions. There is none to do: every marker in `demo_pages/0` (`pages_test.exs:346-356`) and both bare copy assertions (lines 10 and 29) match page **titles**, which this restyle keeps verbatim. No test anywhere asserts an `eyebrow` string or a `demo_facts` bullet. The at-risk set is empty, so that risk is closed rather than mitigated. This plan *adds* assertions; it repairs none.
-6. **Patch Lab has five facts, not four.** The spec says every demo has four `demo_facts` bullets. Seven do; `patch_lab_page.ex:24-30` has five. Move whatever each page has.
-7. **`demo_pages/0` covers seven pages, not eight.** Presence is exercised by `test/dstar_demo_web/presence_page_test.exs` instead. Leave that split alone.
+5. **The suite has 43 tests, not 38.** The spec's Testing section says "of the 38 existing tests"; the actual count at `15dffbb` is 43. Use 43 as the baseline when checking that nothing regressed.
+6. **`pages_test.exs` needs no repair.** The spec's Testing and Risks sections expect churn in the page-render assertions. There is none to do: every marker in `demo_pages/0` (`pages_test.exs:346-356`) and both bare copy assertions (lines 10 and 29) match page **titles**, which this restyle keeps verbatim. No test anywhere asserts an `eyebrow` string or a `demo_facts` bullet. The at-risk set is empty, so that risk is closed rather than mitigated. This plan *adds* assertions; it repairs none.
+7. **Patch Lab has five facts, not four.** The spec says every demo has four `demo_facts` bullets. Seven do; `patch_lab_page.ex:24-30` has five. Move whatever each page has.
+8. **`demo_pages/0` covers seven pages, not eight.** Presence is exercised by `test/dstar_demo_web/presence_page_test.exs` instead. Leave that split alone.
 
 ## File Structure
 
@@ -106,13 +107,10 @@ defmodule DstarDemoWeb.ThemeTest do
   test "the accent is the same orange in both modes", %{css: css} do
     assert css =~ "--color-primary: #e8590c"
   end
-
-  test "DaisyUI component classes are available", %{css: css} do
-    assert css =~ ".btn"
-    assert css =~ ".badge"
-  end
 end
 ```
+
+**Do not add an assertion that DaisyUI component classes such as `.btn` or `.badge` are present.** DaisyUI 5 on Tailwind 4 emits component CSS only when the class is detected in a scanned source. Nothing in this repo uses `badge`, `kbd` or `tabs`, so they are pruned; `.btn` compiles today only incidentally, because the default Phoenix scaffold layout at `lib/dstar_demo_web/components/layouts.ex:48` carries `class="btn btn-ghost"` — a file these Dstar pages do not even render. An assertion on either is asserting a falsehood or a coincidence.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -209,12 +207,12 @@ Note what left: the hand-rolled `:root { color-scheme: dark }` and `[data-theme=
 - [ ] **Step 4: Run test to verify it passes**
 
 Run: `mix test test/dstar_demo_web/theme_test.exs`
-Expected: PASS, 4 tests.
+Expected: PASS, 3 tests.
 
 - [ ] **Step 5: Confirm nothing else broke**
 
 Run: `mix test`
-Expected: PASS. The existing suite asserts markup and behaviour, not colour, so all 38 tests should still pass. (Needs Postgres — `mix db.up` first if it is down.)
+Expected: PASS, 46 tests (43 pre-existing + 3 new). The existing suite asserts markup and behaviour, not colour, so nothing in it should move. (Needs Postgres — `mix db.up` first if it is down. Note this repo runs OrbStack, not Docker Desktop; `pg_isready -h localhost -p 5433 -U postgres` is the reliable readiness check, because OrbStack binds the host port proxy before Postgres is serving.)
 
 - [ ] **Step 6: Commit**
 
@@ -2403,4 +2401,4 @@ Run through these before starting, and again at the end.
 
 **Interaction with other work,** per the spec's closing section: the `:demo` slot is free-form and imposes no grid, wrapper, or width on its contents, so the Live Collections three-panel layout tracked on [Map: a self-demonstrating nudge demo](https://github.com/ricotrevisan/dstar-demo/issues/1) drops in without further shell changes. Nothing in this plan invalidates that map. A ninth demo does need adding to the `@demos` list in `demo_components.ex` and to the home page's tiles — two lines, in the places this plan already touches.
 
-**One thing left for the reviewer to decide.** The spec says to use DaisyUI "for theme tokens plus `btn`, `badge`, `kbd` and `tabs`". This plan uses the tokens everywhere and those four component classes nowhere: `action_button` and `pill` stay hand-written, because DaisyUI's `btn` brings its own radius, shadow and hover treatment, and overriding them back out costs more utilities than writing the button. The stylesheet still ships the classes, so adopting them later is a component-level change. Flagging it rather than deciding silently — if `btn` is wanted on `action_button`, say so and it is a one-component edit in Task 3 Step 3.
+**One thing left for the reviewer to decide.** The spec says to use DaisyUI "for theme tokens plus `btn`, `badge`, `kbd` and `tabs`". This plan uses the tokens everywhere and those four component classes nowhere: `action_button` and `pill` stay hand-written, because DaisyUI's `btn` brings its own radius, shadow and hover treatment, and overriding them back out costs more utilities than writing the button. Adopting them later is a component-level change — but note the stylesheet does **not** ship unused component classes: Tailwind prunes them, so `badge`, `kbd` and `tabs` are absent from the build today and appear only once something uses them. Flagging it rather than deciding silently — if `btn` is wanted on `action_button`, say so and it is a one-component edit in Task 3 Step 3.
