@@ -94,6 +94,29 @@ defmodule DstarDemoWeb.ServerComponentsPage do
           />
         </div>
       </:how_it_works>
+
+      <:comparison>
+        <.prose>
+          Both sides colocate the stage's markup with the handler that updates it,
+          and both re-render the same function on first paint and on every update.
+        </.prose>
+
+        <.compare>
+          <:dstar>
+            <.code_block
+              language={@snippet.wiring_language}
+              label={@snippet.source}
+              code={@snippet.wiring}
+            />
+          </:dstar>
+
+          <:liveview>
+            <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
+          </:liveview>
+
+          <:note>{@snippet.note}</:note>
+        </.compare>
+      </:comparison>
     </.demo_shell>
     """
   end

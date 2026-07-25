@@ -315,8 +315,55 @@ defmodule DstarDemoWeb.Snippets do
         data-class={variant_classes("profile")}
       />
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      defmodule DstarDemoWeb.ComponentStageLive do
+        use DstarDemoWeb, :live_component
+
+        def render(assigns) do
+          ~H\"\"\"
+          <div id={@id}>
+            <button phx-click="profile" phx-target={@myself}>Profile</button>
+            <button phx-click="timeline" phx-target={@myself}>Timeline</button>
+            <button phx-click="deploy" phx-target={@myself}>Deploy</button>
+
+            <p>{@component_kind} · renders: {@render_count}</p>
+          </div>
+          \"\"\"
+        end
+
+        def handle_event(kind, _params, socket) do
+          {:noreply,
+           assign(socket,
+             component_kind: kind,
+             render_count: socket.assigns.render_count + 1
+           )}
+        end
+      end
+
+      # In the parent LiveView:
+      #
+      #   <.live_component
+      #     module={DstarDemoWeb.ComponentStageLive}
+      #     id="component-stage"
+      #     component_kind={@component_kind}
+      #     render_count={@render_count}
+      #   />
+      """,
+      note: """
+      Near parity, and `Phoenix.LiveComponent` does strictly more:
+      it has its own lifecycle through `update/3` and `preload/1`, and it can
+      hold state between events without the parent knowing. If a stage needed to
+      remember anything of its own, LiveView would win here without argument.
+
+      The costs on the LiveView side are that a component requires an `:id`, that
+      every event needs `phx-target={@myself}` or it silently dispatches to the
+      parent instead, and that the component's state still lives in the parent's
+      process. `Dstar.Component` is stateless and routes by module name, so
+      nothing has to be targeted and this page needs no handler clauses at all —
+      but there is no per-instance state to be had, and two stages on one page
+      would share the same handler.
+      """
     },
     signals: %{
       source: "#{@pages}/signals_page.ex",
