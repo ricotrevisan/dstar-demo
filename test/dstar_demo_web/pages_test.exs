@@ -373,13 +373,27 @@ defmodule DstarDemoWeb.PagesTest do
   end
 
   test "jump links are derived from the slots a page actually passes", %{conn: conn} do
-    # No page has a :comparison slot yet, so no page advertises one.
-    for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
-      response = conn |> recycle() |> get(path) |> html_response(200)
+    response = conn |> recycle() |> get(~p"/search") |> html_response(200)
 
-      refute response =~ ~s[href="#comparison"]
-      refute response =~ ~s[id="comparison"]
-    end
+    assert response =~ ~s[href="#comparison"]
+    assert response =~ ~s[id="comparison"]
+    assert response =~ "If this were LiveView"
+
+    # A page with no :comparison slot advertises two jump links, not three.
+    plain = conn |> recycle() |> get(~p"/scripts") |> html_response(200)
+    refute plain =~ ~s[href="#comparison"]
+    refute plain =~ ~s[id="comparison"]
+  end
+
+  test "a comparison labels the LiveView side as illustrative", %{conn: conn} do
+    response = conn |> recycle() |> get(~p"/search") |> html_response(200)
+
+    assert response =~ "illustrative, never compiled or run"
+
+    # The LiveView snippet is displayed as highlighted source, so its bindings
+    # appear as escaped text rather than as live attributes on this page.
+    assert response =~ "phx-debounce"
+    assert response =~ "&quot;240&quot;"
   end
 
   # /components is deliberately absent: its dropped eyebrow was
