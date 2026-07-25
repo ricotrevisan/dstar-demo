@@ -239,8 +239,68 @@ defmodule DstarDemoWeb.Snippets do
       "remove" ->
         remove_elements(conn, "#removable-note")
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      #
+      # LiveView has no patch-mode API at all: you change assigns and it works
+      # out the DOM operation. The nearest thing to append and prepend is a
+      # stream with :at; outer, inner, before and after have no equivalent
+      # because you never name the operation.
+      def mount(_params, _session, socket) do
+        {:ok,
+         socket
+         |> assign(count: 0, note_visible?: true)
+         |> stream(:rows, [%{id: "seed-row", label: "Seed row"}])}
+      end
+
+      def handle_event("append", _params, socket) do
+        count = socket.assigns.count + 1
+
+        {:noreply,
+         socket
+         |> assign(count: count)
+         |> stream_insert(:rows, %{id: "row-" <> to_string(count), label: "append patch"}, at: -1)}
+      end
+
+      def handle_event("prepend", _params, socket) do
+        count = socket.assigns.count + 1
+
+        {:noreply,
+         socket
+         |> assign(count: count)
+         |> stream_insert(:rows, %{id: "row-" <> to_string(count), label: "prepend patch"}, at: 0)}
+      end
+
+      def handle_event("remove", _params, socket) do
+        {:noreply, assign(socket, note_visible?: false)}
+      end
+
+      def render(assigns) do
+        ~H\"\"\"
+        <div id="patch-list" phx-update="stream">
+          <div :for={{dom_id, row} <- @streams.rows} id={dom_id}>{row.label}</div>
+        </div>
+
+        <div :if={@note_visible?} id="removable-note">Remove mode deletes this note.</div>
+        \"\"\"
+      end
+      """,
+      note: """
+      These are different philosophies rather than a winner and a loser.
+      LiveView deliberately hides the DOM operation: you describe the state you
+      want and the diff engine picks the mutation. That is why there is no
+      `:outer` or `:before` to get wrong, and why `remove` is expressed as a
+      conditional rather than a deletion. `phx-update="stream"` covers the
+      append and prepend cases and manages a memory bound for you, which
+      hand-written `mode: :append` calls do not.
+
+      Dstar exposes the operation directly. That is what makes this page
+      demonstrable at all — there is nothing to show if the framework chooses for
+      you — and it is what you need when the server holds no rendered copy of the
+      page to diff against. The honest summary is that most applications want
+      LiveView's abstraction, and the ones that cannot afford resident
+      server-side state want this.
+      """
     },
     server_components: %{
       source: "#{@pages}/server_components_page.ex",
