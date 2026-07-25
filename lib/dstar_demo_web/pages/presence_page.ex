@@ -28,10 +28,13 @@ defmodule DstarDemoWeb.PresencePage do
   @impl Dstar.Page
   def handle_connect(conn, _params) do
     signals = read_signals(conn)
-    # Dstar.start_stream registered this stream under the RAW tabId signal;
-    # registry operations must use that exact key or they silently miss it.
-    registry_tab = signals["tabId"]
-    tab_id = sanitize_token(registry_tab) || random_seed()
+    # Two different keys on purpose. registry_tab is the exact value
+    # Dstar.start_stream registered under — nil when the tabId was unusable
+    # (missing, blank, or over 64 bytes) and this stream is simply not
+    # deduplicated. The presence identity is separate: it only has to be
+    # stable per tab, so an oversized tabId is truncated rather than dropped.
+    registry_tab = Dstar.Utility.StreamRegistry.tab_id(conn)
+    tab_id = sanitize_token(signals["tabId"]) || random_seed()
     presence_instance = sanitize_token(signals["presenceInstance"]) || random_seed()
     name = sanitize_name(signals["visitorName"])
     visitor = visitor_for(name || tab_id)
@@ -74,18 +77,12 @@ defmodule DstarDemoWeb.PresencePage do
   end
 
   @impl Dstar.Page
-  def handle_info(:client_gone, conn), do: {:halt, halt_cleanup(conn)}
-
-  # Dstar's StreamRegistry kills a replaced stream with Process.exit(pid,
-  # :replaced). Over HTTP/1.1, Bandit's connection process traps exits, so
-  # the kill arrives here as a message instead — halt gracefully rather
-  # than lingering as an unhandled-message zombie.
-  def handle_info({:EXIT, _pid, :replaced}, conn), do: {:halt, halt_cleanup(conn)}
+  def handle_info(:client_gone, conn), do: {:halt, conn}
 
   def handle_info({:presence_leave, tab, presence_instance}, conn) do
     if tab != nil and tab == conn.assigns[:registry_tab] and
          presence_instance == conn.assigns.presence_instance do
-      {:halt, halt_cleanup(conn)}
+      {:halt, conn}
     else
       conn
     end
@@ -104,7 +101,7 @@ defmodule DstarDemoWeb.PresencePage do
            )
          end) do
       {:ok, conn} -> conn
-      {:closed, conn} -> {:halt, halt_cleanup(conn)}
+      {:closed, conn} -> {:halt, conn}
     end
   end
 
@@ -116,8 +113,21 @@ defmodule DstarDemoWeb.PresencePage do
            )
          end) do
       {:ok, conn} -> conn
-      {:closed, conn} -> {:halt, halt_cleanup(conn)}
+      {:closed, conn} -> {:halt, conn}
     end
+  end
+
+  # Runs on every exit from the library's receive loop. Dstar releases the
+  # StreamRegistry key itself; this is the app-owned state handle_connect/2
+  # acquired. Both operations are scoped to self(), so a takeover cannot
+  # clobber what the replacing stream already tracked for the same tab.
+  @impl Dstar.Page
+  def handle_disconnect(conn) do
+    if tab_id = conn.assigns[:tab_id] do
+      Presence.untrack(self(), @topic, tab_id)
+    end
+
+    Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, @topic)
   end
 
   @impl Dstar.Page
@@ -139,8 +149,8 @@ defmodule DstarDemoWeb.PresencePage do
   # Sent by the pagehide beacon in app.js. The response body is never read
   # by the browser, so the already-started SSE stream simply closes empty.
   def handle_event(conn, "leave", signals) do
-    # Look up by the RAW tabId — it is the key the stream registered under.
-    registry_tab = signals["tabId"]
+    # Same validation the stream registered under, so the lookup can't miss.
+    registry_tab = Dstar.Utility.StreamRegistry.tab_id(conn)
     presence_instance = sanitize_token(signals["presenceInstance"])
 
     if registry_tab && presence_instance do
@@ -331,28 +341,15 @@ defmodule DstarDemoWeb.PresencePage do
     })
   end
 
-  # No client auto-retry: duplicated tabs share the sessionStorage tabId,
-  # and a killed-and-retried stream re-kills its sibling forever — the
-  # client resets its retry counter on every 200, so any finite budget is
-  # ineffective against the replace-kill loop. data-on:online__window and
-  # the pageshow handler reconnect when it actually matters.
+  # No client auto-retry. Duplicated tabs share the sessionStorage tabId, so
+  # a retried stream re-kills its sibling forever; the client resets its retry
+  # counter on every 200, making any finite budget ineffective. Dstar 0.1.4
+  # ends a taken-over stream cleanly, which alone stops the loop under HTTP/1.1
+  # — but this demo serves HTTP/2, where the connection process does not trap
+  # exits and the takeover kill still surfaces as a transport error the client
+  # retries. data-on:online__window and the pageshow handler cover the cases
+  # where reconnecting actually matters.
   defp room_connect, do: connect(opts: "{retryMaxCount: 0}")
-
-  # A halted stream's process can outlive the stream (Bandit keep-alive
-  # reuses the connection process), so everything scoped to this stream —
-  # presence entry, topic subscription, registry key — must go with it.
-  defp halt_cleanup(conn) do
-    if tab_id = conn.assigns[:tab_id] do
-      Presence.untrack(self(), @topic, tab_id)
-    end
-
-    if registry_tab = conn.assigns[:registry_tab] do
-      Registry.unregister(Dstar.Utility.StreamRegistry, {@stream_scope, registry_tab})
-    end
-
-    Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, @topic)
-    conn
-  end
 
   defp remember_presence_instance(nil, _presence_instance), do: :ok
 

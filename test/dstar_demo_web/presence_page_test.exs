@@ -161,36 +161,42 @@ defmodule DstarDemoWeb.PresencePageTest do
     end
   end
 
-  test "leave flow works for tabIds longer than the sanitized length", %{conn: conn} do
+  test "an oversized tabId streams without dedup but still tracks presence", %{conn: conn} do
     Phoenix.PubSub.subscribe(DstarDemo.PubSub, "presence:lobby")
 
-    # Dstar.start_stream registers the stream under the RAW tabId signal;
-    # the page's registry operations must use the same key or the leave
-    # beacon silently no-ops for forged/oversized tabIds.
+    # dstar 0.1.4 rejects a tabId over 64 bytes rather than registering it,
+    # so the stream runs undeduplicated and the leave beacon has nothing to
+    # look up. Presence is keyed separately and must still work.
     raw_tab = String.duplicate("t", 100)
     presence_tab = String.duplicate("t", 64)
 
     supervisor =
       start_supervised!({Task.Supervisor, name: DstarDemoWeb.PresencePageTest.LongTabSupervisor})
 
-    task =
-      Task.Supervisor.async_nolink(supervisor, fn ->
-        post_json(conn, ~p"/presence", %{
-          "tabId" => raw_tab,
-          "visitorName" => "Visitor Otter",
-          "visitorColor" => "emerald",
-          "presenceInstance" => "long-tab-instance"
-        })
-      end)
+    Task.Supervisor.async_nolink(supervisor, fn ->
+      post_json(conn, ~p"/presence", %{
+        "tabId" => raw_tab,
+        "visitorName" => "Visitor Otter",
+        "visitorColor" => "emerald",
+        "presenceInstance" => "long-tab-instance"
+      })
+    end)
 
     assert_presence_diff(:joins, presence_tab)
 
-    assert [{pid, "long-tab-instance"}] =
-             Registry.lookup(
-               Dstar.Utility.StreamRegistry,
-               {{:dstar_demo, :presence}, raw_tab}
-             )
+    # No registry entry under either the raw or the truncated form — an
+    # unusable tabId means no deduplication at all.
+    assert Registry.lookup(
+             Dstar.Utility.StreamRegistry,
+             {{:dstar_demo, :presence}, raw_tab}
+           ) == []
 
+    assert Registry.lookup(
+             Dstar.Utility.StreamRegistry,
+             {{:dstar_demo, :presence}, presence_tab}
+           ) == []
+
+    # The beacon still answers, it just has no stream to notify.
     leave_conn =
       post_form(conn, ~p"/presence/_event/leave", %{
         "tabId" => raw_tab,
@@ -198,51 +204,44 @@ defmodule DstarDemoWeb.PresencePageTest do
       })
 
     assert leave_conn.state == :chunked
-    assert_receive {ref, %Plug.Conn{state: :chunked}}, 1_000
-    assert ref == task.ref
-    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}, 1_000
-    assert_presence_diff(:leaves, presence_tab)
+    # start_supervised! tears the streaming task down at the end of the test.
   end
 
   @tag timeout: 5_000
-  test "replaced-stream kill arriving as a trapped-exit message halts and cleans up", %{
-    conn: conn
-  } do
-    # Over HTTP/1.1, Bandit's connection process traps exits, so the
-    # StreamRegistry's Process.exit(pid, :replaced) arrives as a plain
-    # {:EXIT, ...} message; the page must halt instead of lingering as a
-    # zombie stream.
-    tab_id = "presence-replaced-msg-tab"
+  test "a takeover by a newer stream halts the old one and runs handle_disconnect", %{conn: conn} do
+    # dstar 0.1.4 halts the library loop on the takeover signal itself, then
+    # calls handle_disconnect/1. This drives the real path — a second claimer
+    # on the same key — rather than seeding the mailbox, which 0.1.4 drains as
+    # a stale signal from before registration.
+    Phoenix.PubSub.subscribe(DstarDemo.PubSub, "presence:lobby")
 
-    signals = %{
-      "tabId" => tab_id,
-      "visitorName" => "Visitor Otter",
-      "visitorColor" => "emerald",
-      "presenceInstance" => "msg-instance"
-    }
+    tab_id = "presence-takeover-tab"
+    key = {{:dstar_demo, :presence}, tab_id}
 
-    conn = %{
-      conn
-      | method: "POST",
-        body_params: signals,
-        params: signals,
-        adapter: {DstarDemoWeb.ClosingSSEAdapter, %{chunks_left: 50}}
-    }
+    supervisor =
+      start_supervised!({Task.Supervisor, name: DstarDemoWeb.PresencePageTest.TakeoverSupervisor})
 
-    send(self(), {:EXIT, self(), :replaced})
+    Task.Supervisor.async_nolink(supervisor, fn ->
+      post_json(conn, ~p"/presence", %{
+        "tabId" => tab_id,
+        "visitorName" => "Visitor Otter",
+        "visitorColor" => "emerald",
+        "presenceInstance" => "takeover-instance"
+      })
+    end)
 
-    assert %Plug.Conn{state: :chunked} =
-             Dstar.Page.Plug.call(
-               conn,
-               Dstar.Page.Plug.init({:stream, DstarDemoWeb.PresencePage})
-             )
+    assert_presence_diff(:joins, tab_id)
+    assert [{_pid, "takeover-instance"}] = Registry.lookup(Dstar.Utility.StreamRegistry, key)
 
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
-             {{:dstar_demo, :presence}, tab_id}
-           ) == []
+    # Exactly what a second stream's Dstar.start_stream does.
+    assert :ok = Dstar.Utility.StreamRegistry.replace_and_register(key)
 
-    refute DstarDemoWeb.Presence.list("presence:lobby") |> Map.has_key?(tab_id)
+    # The old stream halted, so handle_disconnect/1 untracked its presence.
+    assert_presence_diff(:leaves, tab_id)
+    assert [{pid, _}] = Registry.lookup(Dstar.Utility.StreamRegistry, key)
+    assert pid == self()
+  after
+    Dstar.Utility.StreamRegistry.unregister_self()
   end
 
   @tag timeout: 5_000

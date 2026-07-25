@@ -38,3 +38,6 @@ dstar_demo-*.tar
 npm-debug.log
 /assets/node_modules/
 
+# Local Pi MCP configuration.
+/.pi/
+
