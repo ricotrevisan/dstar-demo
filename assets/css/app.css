@@ -10,12 +10,61 @@
    The heroicons installation itself is managed by your mix.exs */
 @plugin "../vendor/heroicons";
 
+/* DaisyUI supplies the theme tokens plus btn, badge, kbd and tabs. Everything
+   structural on these pages is hand-written Tailwind, so DaisyUI's rounded,
+   shadowed product-app look never gets a chance to override the design. */
+@plugin "../vendor/daisyui" {
+  themes: false;
+}
+
+/* Named "light" and "dark" on purpose: assets/js/app.js sets
+   data-theme="light"|"dark", and the theme plugin keys its selector off that
+   attribute. These names also inherit DaisyUI's built-in token sets, so only
+   the five tokens the design specifies need overriding. */
+@plugin "../vendor/daisyui-theme" {
+  name: "light";
+  default: true;
+  color-scheme: "light";
+  --color-base-100: #ffffff;
+  --color-base-200: #fafafa;
+  --color-base-300: #e2e2e2;
+  --color-base-content: #111111;
+  --color-primary: #e8590c;
+  --color-primary-content: #ffffff;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "../vendor/daisyui-theme" {
+  name: "dark";
+  prefersdark: true;
+  color-scheme: "dark";
+  --color-base-100: #0c0c0c;
+  --color-base-200: #141414;
+  --color-base-300: #262626;
+  --color-base-content: #f2f2f2;
+  --color-primary: #e8590c;
+  --color-primary-content: #0c0c0c;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
 /* Add variants based on LiveView classes */
 @custom-variant phx-click-loading (.phx-click-loading&, .phx-click-loading &);
 @custom-variant phx-submit-loading (.phx-submit-loading&, .phx-submit-loading &);
 @custom-variant phx-change-loading (.phx-change-loading&, .phx-change-loading &);
 
-/* Use the data attribute for dark mode  */
+/* Use the data attribute for dark mode. Note this only matches an explicit
+   toggle, not OS-level dark preference — prefer base-* tokens, which flip in
+   both cases, over dark: utilities. */
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 /* Make LiveView wrapper divs transparent for layout */
@@ -23,16 +72,7 @@
 
 /* This file is for your main application CSS */
 
-:root {
-  color-scheme: dark;
-  background: oklch(14.5% 0.01 255);
-}
-
-[data-theme="light"] {
-  color-scheme: light;
-  background: oklch(97% 0.006 255);
-}
-
 html {
   scrollbar-gutter: stable;
+  background: var(--color-base-100);
 }
