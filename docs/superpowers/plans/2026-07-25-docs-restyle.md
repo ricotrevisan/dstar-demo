@@ -285,7 +285,9 @@ defmodule DstarDemoWeb.CodeHighlightTest do
     end
 
     test "escapes the source so markup in a snippet cannot break out" do
-      {:safe, html} = CodeHighlight.highlight(~s(<script>alert(1)</script>), "heex")
+      # ~s[...] not ~s(...) on purpose: a paren-delimited sigil terminates at the
+      # first ")", so ~s(<script>alert(1)</script>) is a SyntaxError.
+      {:safe, html} = CodeHighlight.highlight(~s[<script>alert(1)</script>], "heex")
       html = IO.iodata_to_binary(html)
       refute html =~ "<script>"
       assert html =~ "&lt;"
@@ -352,7 +354,10 @@ defmodule DstarDemoWeb.CodeHighlight do
 
     code
     |> dedent()
-    |> Makeup.highlight_inner_html(lexer: lexer)
+    # group_prefix is pinned because both lexers default it to a random string,
+    # which would make identical input render different HTML every call — unstable
+    # test assertions, and a Datastar fragment that always looks changed.
+    |> Makeup.highlight_inner_html(lexer: lexer, lexer_options: [group_prefix: "hl"])
     |> Phoenix.HTML.raw()
   end
 
@@ -389,7 +394,7 @@ end
 - [ ] **Step 5: Run test to verify it passes**
 
 Run: `mix test test/dstar_demo_web/code_highlight_test.exs`
-Expected: PASS, 10 tests.
+Expected: PASS, 9 tests (4 for `dedent/1`, 5 for `highlight/2`).
 
 - [ ] **Step 6: Add the Makeup token CSS**
 
@@ -403,8 +408,8 @@ Makeup's own `Makeup.stylesheet/1` emits fixed hex colours for a single mode, wh
 .hl code {
   color: var(--color-base-content);
 }
-.hl .c, .hl .c1, .hl .cm {          /* comments */
-  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+.hl .c, .hl .c1, .hl .cm {          /* comments — italic is the real marker */
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
   font-style: italic;
 }
 .hl .k, .hl .kd, .hl .kn {          /* keywords: do, end, def, defmodule */
@@ -413,18 +418,20 @@ Makeup's own `Makeup.stylesheet/1` emits fixed hex colours for a single mode, wh
 .hl .nc, .hl .nf, .hl .nt {         /* module, function and tag names */
   font-weight: 600;
 }
+.hl .o, .hl .p {                    /* operators and punctuation */
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
 .hl .na {                            /* attribute names */
-  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
 }
 .hl .s, .hl .s1, .hl .s2, .hl .ss { /* strings and atoms */
-  color: color-mix(in oklab, var(--color-base-content) 78%, transparent);
-}
-.hl .o, .hl .p {                    /* operators and punctuation */
-  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
 }
 ```
 
-No hue appears in a code block at all — numbers and plain identifiers inherit `base-content` from `.hl code` and are left alone. Every colour here is `base-content` at some opacity, so both themes are covered by the same five rules and nothing in a code block can fail contrast that the body text does not also fail.
+No hue appears in a code block at all — numbers and plain identifiers inherit `base-content` from `.hl code` and are left alone. Every colour is `base-content` at some opacity, so one ladder covers both themes.
+
+**Every step of the ladder must clear 4.5:1, and 58% is the floor that does so in both themes** (measured against `base-content` on `base-200`: `#111111` on `#fafafa` light, `#f2f2f2` on `#141414` dark). Do not go below 60%. An earlier draft used 45% for comments and 50% for punctuation, which measure 3.01:1 and 3.51:1 in light mode — a monochrome ladder is not automatically an accessible one, and operators and punctuation are a large share of the glyphs in Elixir and HEEx. The distinction between comments and everything else is carried by the italic, not by a contrast-failing opacity.
 
 - [ ] **Step 7: Add the `code_block` component**
 
@@ -446,11 +453,18 @@ Then add the component at the end of the module, before the final `end`:
     <figure class="hl min-w-0">
       <figcaption
         :if={@label}
-        class="border border-base-300 border-b-0 bg-base-200 px-4 py-2 font-mono text-xs text-base-content/55"
+        class="border border-base-300 border-b-0 bg-base-200 px-4 py-2 font-mono text-xs text-base-content/70"
       >
         {@label}
       </figcaption>
-      <pre class="overflow-x-auto border border-base-300 bg-base-200 p-4 font-mono text-[13px] leading-6"><code>{highlight(@code, @language)}</code></pre>
+      <%!-- tabindex + role: the pane scrolls horizontally, and WCAG 2.1.1 requires
+            a scrollable region be reachable by keyboard alone. --%>
+      <pre
+        tabindex="0"
+        role="region"
+        aria-label={@label || "Code sample"}
+        class="overflow-x-auto border border-base-300 bg-base-200 p-4 font-mono text-[13px] leading-6"
+      ><code>{highlight(@code, @language)}</code></pre>
     </figure>
     """
   end
