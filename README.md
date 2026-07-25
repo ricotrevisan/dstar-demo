@@ -2,10 +2,31 @@
 
 To start your Phoenix server:
 
-* Run `mix setup` to install and setup dependencies
+* Run `mix setup` to install dependencies, start Postgres, and create the database
 * Start Phoenix endpoint with `mix phx.server` or inside IEx with `iex -S mix phx.server`
 
 Now you can visit [`localhost:4000`](http://localhost:4000) from your browser.
+
+## Database
+
+The Live Collections demo is backed by Postgres; every other demo is
+in-memory. `mix setup` brings the database up via Docker, so the only
+prerequisite is a running Docker daemon.
+
+```bash
+mix db.up      # docker compose up -d --wait
+mix db.down    # stop it again
+mix ecto.reset # drop, create, migrate
+```
+
+It listens on **5433**, not the default 5432, so it stays out of the way of
+any system Postgres you already run. Override with `PGHOST`, `PGPORT`,
+`PGUSER`, `PGPASSWORD` to point at your own instance instead.
+
+Postgres connects lazily, so with the database down the app still boots and
+every non-database demo still works — you just get `:econnrefused` repeating
+in the log until it comes back. `mix test` does need it, since the suite runs
+inside `Ecto.Adapters.SQL.Sandbox`.
 
 ## Local HTTPS
 

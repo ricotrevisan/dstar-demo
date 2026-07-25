@@ -9,6 +9,7 @@ defmodule DstarDemo.Application do
   def start(_type, _args) do
     children = [
       DstarDemoWeb.Telemetry,
+      DstarDemo.Repo,
       Dstar.Utility.StreamRegistry,
       {DNSCluster, query: Application.get_env(:dstar_demo, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: DstarDemo.PubSub},

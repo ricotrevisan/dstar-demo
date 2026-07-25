@@ -1,5 +1,17 @@
 import Config
 
+# Each test runs in its own transaction, rolled back at the end, so tests
+# can run concurrently against one database. MIX_TEST_PARTITION supports
+# `mix test --partitions`.
+config :dstar_demo, DstarDemo.Repo,
+  username: System.get_env("PGUSER", "postgres"),
+  password: System.get_env("PGPASSWORD", "postgres"),
+  hostname: System.get_env("PGHOST", "localhost"),
+  port: String.to_integer(System.get_env("PGPORT", "5433")),
+  database: "dstar_demo_test#{System.get_env("MIX_TEST_PARTITION")}",
+  pool: Ecto.Adapters.SQL.Sandbox,
+  pool_size: System.schedulers_online() * 2
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :dstar_demo, DstarDemoWeb.Endpoint,

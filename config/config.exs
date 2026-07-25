@@ -8,6 +8,7 @@
 import Config
 
 config :dstar_demo,
+  ecto_repos: [DstarDemo.Repo],
   generators: [timestamp_type: :utc_datetime]
 
 # Configure the endpoint

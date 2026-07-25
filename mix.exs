@@ -62,6 +62,8 @@ defmodule DstarDemo.MixProject do
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
       {:dstar, "~> 0.1.4"},
+      {:ecto_sql, "~> 3.13"},
+      {:postgrex, "~> 0.20"},
       {:tidewave, "~> 0.6", only: [:dev]}
     ]
   end
@@ -74,7 +76,12 @@ defmodule DstarDemo.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "assets.setup", "assets.build"],
+      setup: ["deps.get", "db.up", "ecto.setup", "assets.setup", "assets.build"],
+      "db.up": ["cmd docker compose up -d --wait"],
+      "db.down": ["cmd docker compose down"],
+      "ecto.setup": ["ecto.create", "ecto.migrate"],
+      "ecto.reset": ["ecto.drop", "ecto.setup"],
+      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
       "assets.build": ["compile", "tailwind dstar_demo", "esbuild dstar_demo"],
       "assets.deploy": [
