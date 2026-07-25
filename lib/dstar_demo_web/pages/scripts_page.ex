@@ -71,7 +71,7 @@ defmodule DstarDemoWeb.ScriptsPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/scripts_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>

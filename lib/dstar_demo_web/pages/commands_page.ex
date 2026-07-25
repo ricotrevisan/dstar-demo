@@ -48,7 +48,7 @@ defmodule DstarDemoWeb.CommandsPage do
                 name="email"
                 autocomplete="email"
                 placeholder="ada@example.com"
-                hint="Use an @example.com address."
+                hint="Company addresses only — try ada@example.com."
                 field={@validation["email"]}
                 intent={@intent}
                 required
@@ -79,14 +79,14 @@ defmodule DstarDemoWeb.CommandsPage do
               <button
                 id="access-pass-submit"
                 type="submit"
-                class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <.icon name="hero-check-micro" class="size-4" /> Validate
               </button>
               <button
                 id="access-pass-reset"
                 type="reset"
-                class="inline-flex items-center gap-2 rounded-md border border-base-300 px-4 py-2.5 text-sm font-medium text-base-content/80 transition hover:border-base-content/40 hover:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                class="inline-flex items-center gap-2 rounded-md border border-base-300 px-4 py-2.5 text-sm font-medium text-base-content/80 transition hover:border-base-content/40 hover:bg-base-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
               >
                 <.icon name="hero-arrow-path-micro" class="size-4" /> Reset
               </button>
@@ -119,7 +119,7 @@ defmodule DstarDemoWeb.CommandsPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/commands_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>
@@ -138,7 +138,7 @@ defmodule DstarDemoWeb.CommandsPage do
     |> patch(&status_badge/1, intent: intent)
     |> patch(&field_feedback/1,
       name: "email",
-      hint: "Use an @example.com address.",
+      hint: "Company addresses only — try ada@example.com.",
       field: validation["email"],
       intent: intent
     )
@@ -163,7 +163,7 @@ defmodule DstarDemoWeb.CommandsPage do
     |> patch(&status_badge/1, intent: "idle")
     |> patch(&field_feedback/1,
       name: "email",
-      hint: "Use an @example.com address.",
+      hint: "Company addresses only — try ada@example.com.",
       field: validation["email"],
       intent: "idle"
     )
@@ -207,7 +207,7 @@ defmodule DstarDemoWeb.CommandsPage do
         autocomplete={@autocomplete}
         placeholder={@placeholder}
         aria-describedby={@feedback_id}
-        class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-3 text-base text-base-content outline-none transition placeholder:text-base-content/45 focus:border-primary focus:ring-2 focus:ring-primary/20"
+        class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-3 text-base text-base-content transition placeholder:text-base-content/65 focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         {@rest}
       />
       <.field_feedback name={@name} hint={@hint} field={@field} intent={@intent} />
@@ -220,11 +220,11 @@ defmodule DstarDemoWeb.CommandsPage do
   attr :field, :map, required: true
   attr :intent, :string, required: true
 
-  # Feedback text stays monochrome on purpose. Every daisyUI semantic colour
-  # (success, error, …) clears 4.5:1 in exactly one of the two themes and fails
-  # in the other, and `dark:` cannot rescue it because "system" removes the
-  # data-theme attribute entirely. Weight carries the distinction instead; the
-  # tinted status badge and validation chips carry the hue.
+  # Hue is available here because the light theme overrides daisyUI's semantic
+  # tokens with darker variants (error #b91c1c is 6.47:1 on white; dark keeps
+  # daisyUI's #ff627d at 6.81:1 on #0c0c0c). Colour is never the only carrier:
+  # rejected is also `font-medium`, and the message text itself differs per
+  # state ("Company email accepted" vs "Use an @example.com email").
   def field_feedback(assigns) do
     ~H"""
     <span
@@ -232,8 +232,8 @@ defmodule DstarDemoWeb.CommandsPage do
       class={[
         "mt-2 block text-sm transition",
         @intent == "idle" && "text-base-content/65",
-        @intent != "idle" && @field.valid && "text-base-content/70",
-        @intent == "rejected" && !@field.valid && "font-medium text-base-content"
+        @intent != "idle" && @field.valid && "text-success",
+        @intent == "rejected" && !@field.valid && "font-medium text-error"
       ]}
     >
       {field_feedback_message(@intent, @field, @hint)}

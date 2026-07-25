@@ -347,8 +347,12 @@ defmodule DstarDemoWeb.PagesTest do
     assert sse_body(conn) =~ ~s(data-demo-script="redirect")
   end
 
+  # /presence is not in demo_pages/0 — its marker is asserted by
+  # presence_page_test.exs — but it is the largest page in the repo and the one
+  # whose shell conversion carried the most risk, so the shell assertions run
+  # against it too.
   test "demo pages render the documentation shell", %{conn: conn} do
-    for {path, _marker} <- demo_pages() do
+    for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
       response = conn |> recycle() |> get(path) |> html_response(200)
 
       # Persistent sidebar, listing every demo, on every page.
@@ -370,7 +374,7 @@ defmodule DstarDemoWeb.PagesTest do
 
   test "jump links are derived from the slots a page actually passes", %{conn: conn} do
     # No page has a :comparison slot yet, so no page advertises one.
-    for {path, _marker} <- demo_pages() do
+    for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
       response = conn |> recycle() |> get(path) |> html_response(200)
 
       refute response =~ ~s[href="#comparison"]
@@ -405,7 +409,8 @@ defmodule DstarDemoWeb.PagesTest do
           {~p"/patch-lab", "outer replaces the target node."},
           {~p"/components", "ComponentStage is a Dstar.Component: UI plus handle_event/3."},
           {~p"/signals", "handle_event/3 receives the request signals already read."},
-          {~p"/scripts", "execute_script/3 appends a script tag through a patch."}
+          {~p"/scripts", "execute_script/3 appends a script tag through a patch."},
+          {~p"/presence", "Phoenix Presence tracks each browser tab as a visitor."}
         ] do
       response = conn |> recycle() |> get(path) |> html_response(200)
       assert response =~ fact
@@ -413,7 +418,7 @@ defmodule DstarDemoWeb.PagesTest do
   end
 
   test "each page renders a highlighted wiring snippet", %{conn: conn} do
-    for {path, _marker} <- demo_pages() do
+    for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
       response = conn |> recycle() |> get(path) |> html_response(200)
       # Makeup emits token spans; the .hl wrapper carries our token colours.
       assert response =~ ~s[class="hl min-w-0"]

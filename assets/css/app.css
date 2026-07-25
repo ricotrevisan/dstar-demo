@@ -41,6 +41,10 @@
   --color-base-content: #f2f2f2;
   --color-primary: #e8590c;
   --color-primary-content: #0c0c0c;
+  /* neutral is repurposed as the eighth presence hue; DaisyUI ships it as
+     oklch(14% ...) in BOTH modes, which is black-on-black in dark. */
+  --color-neutral: #e879f9;
+  --color-neutral-content: #0c0c0c;
   --radius-selector: 0.25rem;
   --radius-field: 0.25rem;
   --radius-box: 0.25rem;
@@ -59,6 +63,22 @@
   --color-base-content: #111111;
   --color-primary: #e8590c;
   --color-primary-content: #0c0c0c;
+  /* DaisyUI's semantic defaults are calibrated for a dark surface and fail as
+     text on white — its error is #ff627d, 2.87:1. These darker variants let hue
+     carry meaning in small text instead of being decoration only. Measured on
+     #ffffff / on #fafafa: error 6.47/6.20 · success 5.02/4.81 ·
+     warning 4.92/4.72 · neutral 6.32/6.06. All are dark fills, so -content
+     flips to white (4.92-6.47:1). */
+  --color-error: #b91c1c;
+  --color-error-content: #ffffff;
+  --color-success: #15803d;
+  --color-success-content: #ffffff;
+  --color-warning: #a16207;
+  --color-warning-content: #ffffff;
+  /* neutral is repurposed as the eighth presence hue; DaisyUI ships it as
+     oklch(14% ...) in BOTH modes, which is black-on-black in dark. */
+  --color-neutral: #a21caf;
+  --color-neutral-content: #ffffff;
   --radius-selector: 0.25rem;
   --radius-field: 0.25rem;
   --radius-box: 0.25rem;

@@ -122,34 +122,45 @@ defmodule DstarDemoWeb.Layouts do
   """
   def theme_toggle(assigns) do
     ~H"""
-    <div class="relative flex items-center rounded-full border border-zinc-700 bg-zinc-900 p-1 text-zinc-400">
-      <div class="absolute top-1 bottom-1 w-8 rounded-full bg-zinc-100 transition-[left] left-1 [[data-theme=light]_&]:left-9 [[data-theme=dark]_&]:left-[4.25rem]" />
+    <div
+      class="relative flex items-center rounded-full border border-base-300 bg-base-200 p-1 text-base-content/60"
+      role="group"
+      aria-label="Theme"
+    >
+      <%!-- The "system" setting REMOVES data-theme (see setTheme in app.js), so
+      the scaffold's [[data-theme=system]_&] selector could never match and the
+      system icon stayed dim while selected. :root:not([data-theme]) is the
+      condition that actually holds. --%>
+      <div class="absolute top-1 bottom-1 w-8 rounded-full bg-primary transition-[left] left-1 [[data-theme=light]_&]:left-9 [[data-theme=dark]_&]:left-[4.25rem]" />
 
       <button
-        class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-zinc-100 [[data-theme=system]_&]:text-zinc-950"
+        class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [:root:not([data-theme])_&]:text-primary-content"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="system"
         title="System theme"
+        aria-label="Use the system theme"
       >
-        <.icon name="hero-computer-desktop-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-computer-desktop-micro" class="size-4" />
       </button>
 
       <button
-        class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-zinc-100 [[data-theme=light]_&]:text-zinc-950"
+        class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [[data-theme=light]_&]:text-primary-content"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="light"
         title="Light theme"
+        aria-label="Use the light theme"
       >
-        <.icon name="hero-sun-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-sun-micro" class="size-4" />
       </button>
 
       <button
-        class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-zinc-100 [[data-theme=dark]_&]:text-zinc-950"
+        class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [[data-theme=dark]_&]:text-primary-content"
         phx-click={JS.dispatch("phx:set-theme")}
         data-phx-theme="dark"
         title="Dark theme"
+        aria-label="Use the dark theme"
       >
-        <.icon name="hero-moon-micro" class="size-4 opacity-75 hover:opacity-100" />
+        <.icon name="hero-moon-micro" class="size-4" />
       </button>
     </div>
     """

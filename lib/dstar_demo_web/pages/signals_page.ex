@@ -43,7 +43,7 @@ defmodule DstarDemoWeb.SignalsPage do
                   id="signals-scope"
                   data-bind:scope
                   value={@scope}
-                  class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content outline-none transition focus:border-primary"
+                  class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content transition focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </label>
               <label class="block">
@@ -52,7 +52,7 @@ defmodule DstarDemoWeb.SignalsPage do
                   id="signals-filter"
                   data-bind:filter
                   value={@filter}
-                  class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content outline-none transition focus:border-primary"
+                  class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content transition focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </label>
               <label class="block">
@@ -61,7 +61,7 @@ defmodule DstarDemoWeb.SignalsPage do
                   id="signals-ephemeral"
                   data-bind:ephemeral
                   value={@ephemeral}
-                  class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content outline-none transition focus:border-primary"
+                  class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content transition focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </label>
             </div>
@@ -136,7 +136,7 @@ defmodule DstarDemoWeb.SignalsPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/signals_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>

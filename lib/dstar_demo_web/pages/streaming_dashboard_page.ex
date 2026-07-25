@@ -121,7 +121,7 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
             <button
               id="start-stream"
               data-on:click={connect(opts: "{retryMaxCount: 0}")}
-              class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <.icon name="hero-play-micro" class="size-4" /> Start stream
             </button>
@@ -176,7 +176,7 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/streaming_dashboard_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>

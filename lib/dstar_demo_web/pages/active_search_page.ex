@@ -84,7 +84,7 @@ defmodule DstarDemoWeb.ActiveSearchPage do
                   value={@query}
                   placeholder="Try stream, patch, signal, or owner names"
                   autocomplete="off"
-                  class="w-full rounded-md border border-base-300 bg-base-100 py-3 pr-3 pl-10 text-base text-base-content outline-none transition placeholder:text-base-content/45 focus:border-primary"
+                  class="w-full rounded-md border border-base-300 bg-base-100 py-3 pr-3 pl-10 text-base text-base-content transition placeholder:text-base-content/65 focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </div>
             </label>
@@ -97,7 +97,7 @@ defmodule DstarDemoWeb.ActiveSearchPage do
                 data-on:click={"$segment = '#{segment}'; #{event("search")}"}
                 class={[
                   "rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
-                  "focus:outline-none focus:ring-2 focus:ring-primary/40",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   @segment == segment && "border-primary bg-primary text-primary-content",
                   @segment != segment &&
                     "border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100"
@@ -145,7 +145,7 @@ defmodule DstarDemoWeb.ActiveSearchPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/active_search_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>

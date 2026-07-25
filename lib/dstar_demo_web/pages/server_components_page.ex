@@ -89,7 +89,7 @@ defmodule DstarDemoWeb.ServerComponentsPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/server_components_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>

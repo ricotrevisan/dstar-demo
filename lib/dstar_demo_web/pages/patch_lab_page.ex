@@ -34,7 +34,7 @@ defmodule DstarDemoWeb.PatchLabPage do
                 data-class={mode_classes(mode)}
                 class={[
                   "flex items-center justify-between rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
-                  "focus:outline-none focus:ring-2 focus:ring-primary/40",
+                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   @selected_mode == mode && "border-primary bg-primary text-primary-content",
                   @selected_mode != mode &&
                     "border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100"
@@ -116,7 +116,7 @@ defmodule DstarDemoWeb.PatchLabPage do
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/patch_lab_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>

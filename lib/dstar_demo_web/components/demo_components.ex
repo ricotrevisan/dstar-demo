@@ -6,6 +6,8 @@ defmodule DstarDemoWeb.DemoComponents do
   import DstarDemoWeb.CoreComponents
   import DstarDemoWeb.CodeHighlight, only: [highlight: 2]
 
+  alias DstarDemoWeb.Layouts
+
   use Phoenix.VerifiedRoutes,
     endpoint: DstarDemoWeb.Endpoint,
     router: DstarDemoWeb.Router,
@@ -61,15 +63,23 @@ defmodule DstarDemoWeb.DemoComponents do
               <span class="text-sm font-semibold tracking-tight">Dstar Demo</span>
             </a>
 
-            <details class="border-t border-base-300 lg:hidden">
-              <summary class="cursor-pointer list-none px-5 py-3 text-sm text-base-content/70">
-                Demos — {@active}
+            <details class="group border-t border-base-300 lg:hidden">
+              <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-3 text-sm text-base-content/70 [&::-webkit-details-marker]:hidden">
+                <span>Demos — {@active}</span>
+                <.icon
+                  name="hero-chevron-down-micro"
+                  class="size-4 shrink-0 transition-transform group-open:rotate-180"
+                />
               </summary>
               <.demo_nav demos={@demos} active={@active} />
             </details>
 
             <div class="hidden lg:block">
               <.demo_nav demos={@demos} active={@active} />
+            </div>
+
+            <div class="mt-auto flex justify-center border-t border-base-300 px-5 py-4">
+              <Layouts.theme_toggle />
             </div>
           </div>
         </div>
@@ -245,7 +255,7 @@ defmodule DstarDemoWeb.DemoComponents do
       data-on:click={@click}
       class={[
         "inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm font-medium transition",
-        "focus:outline-none focus:ring-2 focus:ring-primary/40",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         @active && "border-primary bg-primary text-primary-content",
         !@active &&
           "border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-200"

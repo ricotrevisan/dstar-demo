@@ -65,6 +65,38 @@ defmodule DstarDemoWeb.ThemeTest do
     assert dark =~ "--color-primary-content: #0c0c0c"
   end
 
+  # daisyUI's semantic defaults are tuned as solid fills on a dark surface, so
+  # as text on white they fail AA — its error token is #ff627d, 2.87:1. The
+  # light theme overrides them with darker variants so hue can carry meaning in
+  # small text (the rejected-field message) rather than only in backgrounds.
+  test "the light theme darkens the semantic tokens so they pass as text on white", %{css: css} do
+    light = theme_rule(css, @light_marker)
+
+    assert light =~ "--color-error: #b91c1c"
+    assert light =~ "--color-success: #15803d"
+    assert light =~ "--color-warning: #a16207"
+    assert light =~ "--color-neutral: #a21caf"
+
+    # All four are dark fills, so their foregrounds flip to white.
+    assert light =~ "--color-error-content: #ffffff"
+    assert light =~ "--color-success-content: #ffffff"
+    assert light =~ "--color-warning-content: #ffffff"
+    assert light =~ "--color-neutral-content: #ffffff"
+  end
+
+  # The presence roster needs eight distinguishable hues and borrows daisyUI's
+  # eight semantic tokens. `neutral` ships as oklch(14% ...) in BOTH of daisyUI's
+  # theme blocks, so an avatar filled with it is black-on-black in dark mode.
+  # Both themes therefore override it with a real hue.
+  test "neutral is a real hue in dark, not daisyUI's near-black", %{css: css} do
+    dark = theme_rule(css, @dark_marker)
+
+    assert dark =~ "--color-neutral: #e879f9"
+    assert dark =~ "--color-neutral-content: #0c0c0c"
+
+    refute dark =~ "--color-neutral: oklch(14%"
+  end
+
   test "the light selector is declared after the OS-dark media query, so an explicit light toggle beats OS dark preference",
        %{css: css} do
     media_index = require_index(css, @media_marker, "the OS-dark media query")
