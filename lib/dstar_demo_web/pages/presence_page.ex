@@ -277,6 +277,30 @@ defmodule DstarDemoWeb.PresencePage do
           />
         </div>
       </:how_it_works>
+
+      <:comparison>
+        <.prose>
+          Both sides track each tab with `Phoenix.Presence`, react to
+          `presence_diff`, and broadcast a room ping. They differ in what has to
+          happen when a visitor leaves.
+        </.prose>
+
+        <.compare>
+          <:dstar>
+            <.code_block
+              language={@snippet.wiring_language}
+              label={@snippet.source}
+              code={@snippet.wiring}
+            />
+          </:dstar>
+
+          <:liveview>
+            <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
+          </:liveview>
+
+          <:note>{@snippet.note}</:note>
+        </.compare>
+      </:comparison>
     </.demo_shell>
     """
   end

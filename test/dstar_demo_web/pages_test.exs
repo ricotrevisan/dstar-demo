@@ -372,17 +372,15 @@ defmodule DstarDemoWeb.PagesTest do
     end
   end
 
-  test "jump links are derived from the slots a page actually passes", %{conn: conn} do
-    response = conn |> recycle() |> get(~p"/search") |> html_response(200)
+  test "every demo page advertises and renders its LiveView comparison", %{conn: conn} do
+    for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
+      response = conn |> recycle() |> get(path) |> html_response(200)
 
-    assert response =~ ~s[href="#comparison"]
-    assert response =~ ~s[id="comparison"]
-    assert response =~ "If this were LiveView"
-
-    # A page with no :comparison slot advertises two jump links, not three.
-    plain = conn |> recycle() |> get(~p"/presence") |> html_response(200)
-    refute plain =~ ~s[href="#comparison"]
-    refute plain =~ ~s[id="comparison"]
+      assert response =~ ~s[href="#comparison"], "#{path} has no comparison jump link"
+      assert response =~ ~s[id="comparison"], "#{path} renders no comparison section"
+      assert response =~ "If this were LiveView"
+      assert response =~ "illustrative, never compiled or run"
+    end
   end
 
   test "a comparison labels the LiveView side as illustrative", %{conn: conn} do

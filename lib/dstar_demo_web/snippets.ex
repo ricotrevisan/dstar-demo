@@ -498,8 +498,60 @@ defmodule DstarDemoWeb.Snippets do
           last_seen: System.system_time(:second)
         })
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      def mount(_params, _session, socket) do
+        if connected?(socket) do
+          Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
+
+          {:ok, _} =
+            Presence.track(self(), @topic, socket.id, %{
+              name: socket.assigns.visitor_name,
+              color: socket.assigns.visitor_color,
+              status: "active",
+              last_seen: System.system_time(:second)
+            })
+        end
+
+        {:ok, assign(socket, roster: Presence.list(@topic), activity: [])}
+      end
+
+      def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
+        {:noreply, assign(socket, roster: Presence.list(@topic))}
+      end
+
+      def handle_event("ping", _params, socket) do
+        Phoenix.PubSub.broadcast(
+          DstarDemo.PubSub,
+          @topic,
+          {:ping, socket.assigns.visitor_name}
+        )
+
+        {:noreply, socket}
+      end
+
+      # No untrack is written anywhere. Presence is bound to self(), and the
+      # LiveView process dying on disconnect removes the entry — including when
+      # it dies by crashing.
+      """,
+      note: """
+      LiveView wins, and this demo shows precisely why. Presence is keyed to a
+      process, and a LiveView already has one per connection: tracking happens
+      once in `mount/3`, and untracking happens for free when the process dies.
+
+      A Dstar stream is a request that has to clean up after itself. This page
+      therefore needs `handle_disconnect/1` to untrack, a `presence_instance`
+      token so a replaced stream can tell itself apart from the one that replaced
+      it, and a `pagehide` beacon in `app.js` posting a `leave` event so a closed
+      tab does not sit in the roster until it times out. That is three moving
+      parts LiveView does not have, and all three are visible in this page's
+      source.
+
+      What Dstar gets back is that nothing is resident between events. For
+      presence specifically, resident state is the entire feature — so this is
+      the demo where the Dstar version is hardest to justify on its own merits,
+      and it is here to show the pattern rather than to recommend it.
+      """
     }
   }
 
