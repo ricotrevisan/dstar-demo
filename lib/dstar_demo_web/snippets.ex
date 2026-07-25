@@ -378,8 +378,51 @@ defmodule DstarDemoWeb.Snippets do
         |> patch(&inspector/1, state)
       end
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      #
+      # There is no client-owned state to inspect: assigns live on the server,
+      # and the client only ever sends what a binding names explicitly. So this
+      # page has no real LiveView counterpart — only the nearest thing.
+      def mount(_params, _session, socket) do
+        {:ok,
+         assign(socket,
+           scope: "release",
+           filter: "open",
+           server_tick: 0,
+           audit_trail: "mount"
+         )}
+      end
+
+      def handle_event("patch", _params, socket) do
+        tick = socket.assigns.server_tick + 1
+
+        {:noreply, assign(socket, server_tick: tick, audit_trail: "assign tick")}
+      end
+
+      # To send client-held values at all, each one must be named:
+      #
+      #   <button phx-click="patch" phx-value-scope={@scope} phx-value-filter={@filter}>
+      #
+      # or a JS hook pushes them:
+      #
+      #   this.pushEvent("patch", {scope, filter})
+      """,
+      note: """
+      This is the one page where the two frameworks disagree about where state
+      lives rather than one doing the same job better. LiveView's assigns are
+      server-authoritative: the client cannot invent a field, so there is nothing
+      to validate, no `remove_signals/2` to need, and no way for a stale client
+      value to reach a handler. That is genuinely simpler and genuinely safer,
+      and for most applications it is the right default.
+
+      Dstar's signals are client-owned and arrive with every event, which is what
+      makes an inspector like this one possible — and it means every handler must
+      treat them as untrusted input. The tax is visible in this page's own code:
+      `client_state/2` drops `csrf`, `_csrf_token`, `tabId` and `last_read` before
+      displaying anything, and each numeric field is parsed defensively because a
+      signal can arrive as a string, or as `""` when it was never set.
+      """
     },
     scripts: %{
       source: "#{@pages}/scripts_page.ex",

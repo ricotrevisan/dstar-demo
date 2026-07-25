@@ -141,6 +141,29 @@ defmodule DstarDemoWeb.SignalsPage do
           />
         </div>
       </:how_it_works>
+
+      <:comparison>
+        <.prose>
+          This is the one comparison where the two sides are not solving the same
+          problem, because LiveView does not have the concept this page inspects.
+        </.prose>
+
+        <.compare>
+          <:dstar>
+            <.code_block
+              language={@snippet.wiring_language}
+              label={@snippet.source}
+              code={@snippet.wiring}
+            />
+          </:dstar>
+
+          <:liveview>
+            <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
+          </:liveview>
+
+          <:note>{@snippet.note}</:note>
+        </.compare>
+      </:comparison>
     </.demo_shell>
     """
   end
