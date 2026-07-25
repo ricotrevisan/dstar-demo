@@ -90,12 +90,14 @@ html {
 /* Makeup token colours, written against theme tokens so they follow
    light/dark. Deliberately monochrome: the accent fails the 4.5:1 floor for
    small text, and code is small text, so weight, opacity and italics carry the
-   distinction instead of hue. Only the classes our two lexers emit are styled. */
+   distinction instead of hue. Every step below clears 4.5:1 in both themes at
+   the component's own text-[13px]; 58% is the measured floor, so nothing here
+   may go below 60%. Only the classes our two lexers emit are styled. */
 .hl code {
   color: var(--color-base-content);
 }
-.hl .c, .hl .c1, .hl .cm {          /* comments */
-  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+.hl .c, .hl .c1, .hl .cm {          /* comments — italic is the real marker */
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
   font-style: italic;
 }
 .hl .k, .hl .kd, .hl .kn {          /* keywords: do, end, def, defmodule */
@@ -104,12 +106,12 @@ html {
 .hl .nc, .hl .nf, .hl .nt {         /* module, function and tag names */
   font-weight: 600;
 }
+.hl .o, .hl .p {                    /* operators and punctuation */
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
 .hl .na {                            /* attribute names */
-  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
 }
 .hl .s, .hl .s1, .hl .s2, .hl .ss { /* strings and atoms */
-  color: color-mix(in oklab, var(--color-base-content) 78%, transparent);
-}
-.hl .o, .hl .p {                    /* operators and punctuation */
-  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+  color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
 }

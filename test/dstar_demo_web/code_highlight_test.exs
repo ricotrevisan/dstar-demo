@@ -21,6 +21,10 @@ defmodule DstarDemoWeb.CodeHighlightTest do
     test "trims leading and trailing blank lines" do
       assert CodeHighlight.dedent("\n\n  a = 1\n\n") == "a = 1"
     end
+
+    test "trims a leading whitespace-only line, not just literal newlines" do
+      assert CodeHighlight.dedent("   \n  a = 1\n") == "a = 1"
+    end
   end
 
   describe "highlight/2" do
@@ -41,7 +45,11 @@ defmodule DstarDemoWeb.CodeHighlightTest do
     test "escapes the source so markup in a snippet cannot break out" do
       {:safe, html} = CodeHighlight.highlight(~s[<script>alert(1)</script>], "heex")
       html = IO.iodata_to_binary(html)
-      refute html =~ "<script>"
+      # "<" and "script" land in separate Makeup spans, so refuting the
+      # contiguous literal "<script>" would pass whether or not escaping
+      # actually happened. Instead assert that no tag appears anywhere in the
+      # output except Makeup's own <span ...> markup.
+      refute html =~ ~r|<(?!/?span[ >])|
       assert html =~ "&lt;"
     end
 
@@ -52,6 +60,12 @@ defmodule DstarDemoWeb.CodeHighlightTest do
 
     test "rejects an unknown language" do
       assert_raise KeyError, fn -> CodeHighlight.highlight("x", "ruby") end
+    end
+
+    test "is deterministic: identical input renders identical output" do
+      {:safe, html1} = CodeHighlight.highlight("def f(x), do: x", "elixir")
+      {:safe, html2} = CodeHighlight.highlight("def f(x), do: x", "elixir")
+      assert IO.iodata_to_binary(html1) == IO.iodata_to_binary(html2)
     end
   end
 end

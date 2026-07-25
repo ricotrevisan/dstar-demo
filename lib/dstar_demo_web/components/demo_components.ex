@@ -190,11 +190,16 @@ defmodule DstarDemoWeb.DemoComponents do
     <figure class="hl min-w-0">
       <figcaption
         :if={@label}
-        class="border border-base-300 border-b-0 bg-base-200 px-4 py-2 font-mono text-xs text-base-content/55"
+        class="border border-base-300 border-b-0 bg-base-200 px-4 py-2 font-mono text-xs text-base-content/70"
       >
         {@label}
       </figcaption>
-      <pre class="overflow-x-auto border border-base-300 bg-base-200 p-4 font-mono text-[13px] leading-6"><code>{highlight(@code, @language)}</code></pre>
+      <pre
+        tabindex="0"
+        role="region"
+        aria-label={@label || "Code sample"}
+        class="overflow-x-auto border border-base-300 bg-base-200 p-4 font-mono text-[13px] leading-6"
+      ><code>{highlight(@code, @language)}</code></pre>
     </figure>
     """
   end

@@ -21,7 +21,12 @@ defmodule DstarDemoWeb.CodeHighlight do
 
     code
     |> dedent()
-    |> Makeup.highlight_inner_html(lexer: lexer)
+    # Both lexers default group_prefix to a random string, so identical input
+    # would render different HTML (and different data-group-id attributes) on
+    # every call. Pin it: we don't ship the JS that uses those ids, and
+    # deterministic output matters for both testability and Datastar's
+    # fragment diffing (a random prefix always looks "changed").
+    |> Makeup.highlight_inner_html(lexer: lexer, lexer_options: [group_prefix: "hl"])
     |> Phoenix.HTML.raw()
   end
 
@@ -34,11 +39,18 @@ defmodule DstarDemoWeb.CodeHighlight do
   """
   @spec dedent(String.t()) :: String.t()
   def dedent(code) when is_binary(code) do
+    # Trim blank (whitespace-only, not just literal "\n") lines from both
+    # ends by dropping list elements, not by string-trimming the raw text —
+    # `String.trim(code, "\n")` only strips literal newline characters, so a
+    # leading line of pure spaces would survive and render as a blank first
+    # row inside the <pre>.
     lines =
       code
-      |> String.trim("\n")
-      |> String.trim_trailing()
       |> String.split("\n")
+      |> Enum.drop_while(&(String.trim(&1) == ""))
+      |> Enum.reverse()
+      |> Enum.drop_while(&(String.trim(&1) == ""))
+      |> Enum.reverse()
 
     indent =
       lines
