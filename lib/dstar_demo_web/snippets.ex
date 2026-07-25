@@ -440,8 +440,47 @@ defmodule DstarDemoWeb.Snippets do
         )
       end
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      def handle_event("execute", _params, socket) do
+        runs = socket.assigns.script_runs + 1
+
+        {:noreply,
+         socket
+         |> assign(script_runs: runs, last_script_action: "push_event")
+         |> push_event("script-pulse", %{run: runs})}
+      end
+
+      def handle_event("redirect", _params, socket) do
+        {:noreply, push_navigate(socket, to: ~p"/scripts?redirected=1")}
+      end
+
+      # The browser half is a hook, declared once in your bundle rather than
+      # sent down per event:
+      #
+      #   Hooks.ScriptPulse = {
+      #     mounted() {
+      #       this.handleEvent("script-pulse", ({run}) => {
+      #         document.documentElement.dataset.dstarScriptPulse = String(run)
+      #       })
+      #     }
+      #   }
+      """,
+      note: """
+      LiveView's design is better here, and the difference is a security one.
+      `push_event/3` sends **data** to a named hook that already exists in your
+      bundle; `execute_script/3` sends **code**. Anything interpolated into that
+      string is one mistake away from running in the browser — which is why this
+      page's own counter goes through `Jason.encode!/1` before it is spliced in.
+      LiveView also gives `push_navigate/2` and `push_patch/2`, which move the
+      user without discarding the process, where `redirect/3` is a full
+      navigation.
+
+      Dstar's helpers win on immediacy only: no hook has to be written,
+      registered, or bundled to make a one-off effect happen. That is why they
+      exist, and it is also why the other seven demos deliberately avoid them —
+      the server-rendered patch flow stays easier to inspect without them.
+      """
     },
     presence: %{
       source: "#{@pages}/presence_page.ex",

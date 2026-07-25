@@ -380,7 +380,7 @@ defmodule DstarDemoWeb.PagesTest do
     assert response =~ "If this were LiveView"
 
     # A page with no :comparison slot advertises two jump links, not three.
-    plain = conn |> recycle() |> get(~p"/scripts") |> html_response(200)
+    plain = conn |> recycle() |> get(~p"/presence") |> html_response(200)
     refute plain =~ ~s[href="#comparison"]
     refute plain =~ ~s[id="comparison"]
   end
