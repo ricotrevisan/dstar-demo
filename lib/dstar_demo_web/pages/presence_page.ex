@@ -162,11 +162,12 @@ defmodule DstarDemoWeb.PresencePage do
 
   @impl Dstar.Page
   def render(assigns) do
+    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:presence))
+
     ~H"""
     <.demo_shell
       active="Presence"
       title="Presence room"
-      eyebrow="Realtime presence"
       summary="Open this page in multiple tabs to see visitors join, leave, and send collaborative room pings through Phoenix Presence and Dstar patches."
       signals={
         %{
@@ -177,81 +178,105 @@ defmodule DstarDemoWeb.PresencePage do
         }
       }
     >
-      <:aside>
-        <.demo_facts items={[
+      <:demo>
+        <section
+          id="presence-room"
+          data-init={room_connect()}
+          data-on:online__window={room_connect()}
+          data-on:pageshow__window={"evt.persisted && ($presenceInstance = crypto.randomUUID(), el.dataset.presenceInstance = $presenceInstance, #{room_connect()})"}
+          data-presence-leave-url={~p"/presence/_event/leave"}
+          data-presence-instance={@presenceInstance}
+          class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"
+        >
+          <div class="grid gap-5">
+            <div class="border border-base-300 bg-base-200">
+              <div class="p-5 sm:p-6">
+                <div class="flex flex-wrap items-start justify-between gap-4">
+                  <div>
+                    <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">
+                      Lobby
+                    </p>
+                    <h2 class="mt-2 text-2xl font-semibold text-base-content">
+                      Who is here right now?
+                    </h2>
+                    <p class="mt-2 max-w-[68ch] text-sm leading-6 text-base-content/70">
+                      Keep this tab open, then open another. Each tab becomes a distinct presence and receives live roster patches.
+                    </p>
+                  </div>
+                  <button
+                    id="presence-ping"
+                    data-on:click={event("ping")}
+                    class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+                  >
+                    <.icon name="hero-sparkles-micro" class="size-4" /> Ping room
+                  </button>
+                </div>
+
+                <.presence_board users={[]} />
+              </div>
+            </div>
+          </div>
+
+          <aside class="grid gap-5">
+            <div class="border border-base-300 bg-base-100 p-5">
+              <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">You</p>
+              <div class="mt-4 flex items-center gap-3">
+                <span class={[
+                  "grid size-11 place-items-center rounded-full text-sm font-bold",
+                  color_class(@visitorColor)
+                ]}>
+                  {initials(@visitorName)}
+                </span>
+                <div>
+                  <p class="font-semibold text-base-content">{@visitorName}</p>
+                  <p class="text-sm text-base-content/70">
+                    status: <span data-text="$presenceStatus">{@presenceStatus}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div class="border border-base-300 bg-base-100 p-5">
+              <div class="flex items-center justify-between gap-3">
+                <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">
+                  Activity
+                </p>
+                <.pill label="broadcast" tone="info" />
+              </div>
+              <div id="presence-activity" class="mt-4 space-y-2">
+                <.activity_row message="Waiting for visitors…" kind="idle" color="zinc" />
+              </div>
+            </div>
+          </aside>
+        </section>
+      </:demo>
+
+      <:how_it_works>
+        <.key_points items={[
           "Phoenix Presence tracks each browser tab as a visitor.",
           "handle_connect/2 and handle_info/2 drive the room stream.",
           "Roster, online count, and activity are patched independently.",
           "The ping button broadcasts a tiny collaborative interaction."
         ]} />
-      </:aside>
 
-      <section
-        id="presence-room"
-        data-init={room_connect()}
-        data-on:online__window={room_connect()}
-        data-on:pageshow__window={"evt.persisted && ($presenceInstance = crypto.randomUUID(), el.dataset.presenceInstance = $presenceInstance, #{room_connect()})"}
-        data-presence-leave-url={~p"/presence/_event/leave"}
-        data-presence-instance={@presenceInstance}
-        class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]"
-      >
-        <div class="grid gap-5">
-          <div class="overflow-hidden rounded-2xl border border-emerald-300/20 bg-zinc-900 shadow-2xl shadow-emerald-950/20">
-            <div class="relative p-5 sm:p-6">
-              <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-300 via-sky-300 to-violet-300">
-              </div>
-              <div class="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">Lobby</p>
-                  <h2 class="mt-2 text-2xl font-semibold text-zinc-50">Who is here right now?</h2>
-                  <p class="mt-2 max-w-2xl text-sm leading-6 text-zinc-400">
-                    Keep this tab open, then open another. Each tab becomes a distinct presence and receives live roster patches.
-                  </p>
-                </div>
-                <button
-                  id="presence-ping"
-                  data-on:click={event("ping")}
-                  class="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:-translate-y-0.5 hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
-                >
-                  <.icon name="hero-sparkles-micro" class="size-4" /> Ping room
-                </button>
-              </div>
+        <.prose>
+          <code class="font-mono text-sm">handle_connect/2</code>
+          subscribes to the room topic and tracks this tab with <code class="font-mono text-sm">Phoenix.Presence</code>, then patches the roster.
+          <code class="font-mono text-sm">handle_info/2</code>
+          reacts to <code class="font-mono text-sm">presence_diff</code>
+          broadcasts, and <code class="font-mono text-sm">handle_disconnect/1</code>
+          untracks on every exit from the receive loop — bookkeeping that a per-connection process
+          would do for you.
+        </.prose>
 
-              <.presence_board users={[]} />
-            </div>
-          </div>
+        <div class="mt-6">
+          <.code_block
+            language={@snippet.wiring_language}
+            label="lib/dstar_demo_web/pages/presence_page.ex"
+            code={@snippet.wiring}
+          />
         </div>
-
-        <aside class="grid gap-5">
-          <div class="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-            <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">You</p>
-            <div class="mt-4 flex items-center gap-3">
-              <span class={[
-                "grid size-11 place-items-center rounded-full text-sm font-bold text-zinc-950",
-                color_class(@visitorColor)
-              ]}>
-                {initials(@visitorName)}
-              </span>
-              <div>
-                <p class="font-semibold text-zinc-100">{@visitorName}</p>
-                <p class="text-sm text-zinc-500">
-                  status: <span data-text="$presenceStatus">{@presenceStatus}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div class="rounded-2xl border border-zinc-800 bg-zinc-950 p-5">
-            <div class="flex items-center justify-between gap-3">
-              <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">Activity</p>
-              <.pill label="broadcast" tone="info" />
-            </div>
-            <div id="presence-activity" class="mt-4 space-y-2">
-              <.activity_row message="Waiting for visitors…" kind="idle" color="zinc" />
-            </div>
-          </div>
-        </aside>
-      </section>
+      </:how_it_works>
     </.demo_shell>
     """
   end
@@ -261,35 +286,35 @@ defmodule DstarDemoWeb.PresencePage do
   def presence_board(assigns) do
     ~H"""
     <div id="presence-board" class="mt-6 grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
-      <div id="presence-count" class="rounded-xl border border-zinc-800 bg-zinc-950 p-4">
-        <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">Online now</p>
-        <p class="mt-3 text-4xl font-semibold text-zinc-50">{length(@users)}</p>
-        <p class="mt-1 text-sm text-zinc-500">active browser tabs</p>
+      <div id="presence-count" class="border border-base-300 bg-base-100 p-4">
+        <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">Online now</p>
+        <p class="mt-3 text-4xl font-semibold tabular-nums text-base-content">{length(@users)}</p>
+        <p class="mt-1 text-sm text-base-content/70">active browser tabs</p>
       </div>
       <div id="presence-roster" class="grid gap-2">
         <div
           :if={@users == []}
-          class="rounded-xl border border-dashed border-zinc-700 bg-zinc-950/70 p-4 text-sm text-zinc-500"
+          class="border border-dashed border-base-300 bg-base-100 p-4 text-sm text-base-content/70"
         >
           Connecting to the room stream…
         </div>
         <div
           :for={user <- @users}
-          class="flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950 p-3"
+          class="flex items-center justify-between gap-3 border border-base-300 bg-base-100 p-3"
         >
           <div class="flex min-w-0 items-center gap-3">
             <span class={[
-              "grid size-10 place-items-center rounded-full text-xs font-bold text-zinc-950",
+              "grid size-10 place-items-center rounded-full text-xs font-bold",
               color_class(user.color)
             ]}>
               {initials(user.name)}
             </span>
             <div class="min-w-0">
-              <p class="truncate text-sm font-semibold text-zinc-100">{user.name}</p>
-              <p class="text-xs text-zinc-500">active now</p>
+              <p class="truncate text-sm font-semibold text-base-content">{user.name}</p>
+              <p class="text-xs text-base-content/65">active now</p>
             </div>
           </div>
-          <span class="size-2 rounded-full bg-emerald-300 shadow-lg shadow-emerald-300/40"></span>
+          <span class="size-2 rounded-full bg-primary"></span>
         </div>
       </div>
     </div>
@@ -302,7 +327,7 @@ defmodule DstarDemoWeb.PresencePage do
 
   def activity_row(assigns) do
     ~H"""
-    <div class="rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
+    <div class="border border-base-300 bg-base-200 px-3 py-2 text-sm text-base-content/80">
       <span class={["mr-2 inline-block size-2 rounded-full", dot_class(@kind, @color)]}></span>{@message}
     </div>
     """
@@ -413,17 +438,32 @@ defmodule DstarDemoWeb.PresencePage do
     |> Enum.map_join("", &String.first/1)
   end
 
-  defp color_class("sky"), do: "bg-sky-300"
-  defp color_class("violet"), do: "bg-violet-300"
-  defp color_class("amber"), do: "bg-amber-300"
-  defp color_class("rose"), do: "bg-rose-300"
-  defp color_class("cyan"), do: "bg-cyan-300"
-  defp color_class("lime"), do: "bg-lime-300"
-  defp color_class("fuchsia"), do: "bg-fuchsia-300"
-  defp color_class(_), do: "bg-emerald-300"
+  # The visitor palette is the one place this demo needs eight distinguishable
+  # hues. They map onto daisyUI's eight semantic tokens rather than raw Tailwind
+  # swatches, so the avatars follow the theme in both light and dark, and each
+  # pairs with its own `*-content` foreground — which is exactly the token those
+  # values are calibrated for, unlike a tinted background. The `@colors` names
+  # themselves are unchanged; they are presence metadata, not CSS.
+  defp swatch_class("sky"), do: "bg-info"
+  defp swatch_class("violet"), do: "bg-secondary"
+  defp swatch_class("amber"), do: "bg-warning"
+  defp swatch_class("rose"), do: "bg-error"
+  defp swatch_class("cyan"), do: "bg-accent"
+  defp swatch_class("lime"), do: "bg-primary"
+  defp swatch_class("fuchsia"), do: "bg-neutral"
+  defp swatch_class(_), do: "bg-success"
 
-  defp dot_class("join", color), do: color_class(color)
-  defp dot_class("ping", _), do: "bg-amber-300"
-  defp dot_class("diff", _), do: "bg-sky-300"
-  defp dot_class(_, _), do: "bg-zinc-500"
+  defp color_class("sky"), do: "bg-info text-info-content"
+  defp color_class("violet"), do: "bg-secondary text-secondary-content"
+  defp color_class("amber"), do: "bg-warning text-warning-content"
+  defp color_class("rose"), do: "bg-error text-error-content"
+  defp color_class("cyan"), do: "bg-accent text-accent-content"
+  defp color_class("lime"), do: "bg-primary text-primary-content"
+  defp color_class("fuchsia"), do: "bg-neutral text-neutral-content"
+  defp color_class(_), do: "bg-success text-success-content"
+
+  defp dot_class("join", color), do: swatch_class(color)
+  defp dot_class("ping", _), do: "bg-warning"
+  defp dot_class("diff", _), do: "bg-info"
+  defp dot_class(_, _), do: "bg-base-content/45"
 end

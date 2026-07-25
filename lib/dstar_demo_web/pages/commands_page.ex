@@ -12,98 +12,118 @@ defmodule DstarDemoWeb.CommandsPage do
 
   @impl Dstar.Page
   def render(assigns) do
+    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:commands))
+
     ~H"""
     <.demo_shell
       active="Form Validation"
       title="Form data validation"
-      eyebrow="Form Data"
       summary="Datastar submits a real form with contentType: 'form'. The server validates the fields and patches only the status, field feedback, and submitted payload."
     >
-      <:aside>
-        <.demo_facts items={[
+      <:demo>
+        <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <form
+            id="access-pass-form"
+            novalidate
+            data-on:submit={event("validate", opts: "{contentType: 'form'}")}
+            data-on:reset={event("reset")}
+            class="border border-base-300 bg-base-200 p-5"
+          >
+            <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+
+            <div class="mb-6 flex items-start justify-between gap-4">
+              <div>
+                <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">
+                  Form surface
+                </p>
+                <h2 class="mt-2 text-2xl font-semibold text-base-content">Create an access pass</h2>
+              </div>
+              <.status_badge intent={@intent} />
+            </div>
+
+            <div class="grid gap-4">
+              <.form_input
+                label="Email"
+                type="email"
+                name="email"
+                autocomplete="email"
+                placeholder="ada@example.com"
+                hint="Use an @example.com address."
+                field={@validation["email"]}
+                intent={@intent}
+                required
+              />
+              <.form_input
+                label="First name"
+                name="first_name"
+                autocomplete="given-name"
+                placeholder="Ada"
+                field={@validation["first_name"]}
+                intent={@intent}
+                minlength="2"
+                required
+              />
+              <.form_input
+                label="Last name"
+                name="last_name"
+                autocomplete="family-name"
+                placeholder="Lovelace"
+                field={@validation["last_name"]}
+                intent={@intent}
+                minlength="2"
+                required
+              />
+            </div>
+
+            <div class="mt-6 flex flex-wrap items-center gap-3">
+              <button
+                id="access-pass-submit"
+                type="submit"
+                class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <.icon name="hero-check-micro" class="size-4" /> Validate
+              </button>
+              <button
+                id="access-pass-reset"
+                type="reset"
+                class="inline-flex items-center gap-2 rounded-md border border-base-300 px-4 py-2.5 text-sm font-medium text-base-content/80 transition hover:border-base-content/40 hover:bg-base-100 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                <.icon name="hero-arrow-path-micro" class="size-4" /> Reset
+              </button>
+            </div>
+
+            <.validation_panel validation={@validation} intent={@intent} />
+          </form>
+
+          <.payload_panel submitted={@submitted} />
+        </section>
+      </:demo>
+
+      <:how_it_works>
+        <.key_points items={[
           "novalidate keeps the browser from intercepting the demo.",
           "contentType: 'form' sends form fields instead of Datastar signals.",
           "The inputs keep their values while server-owned feedback is patched.",
           "patch/3 updates status, field errors, summary, and payload fragments."
         ]} />
-      </:aside>
 
-      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <form
-          id="access-pass-form"
-          novalidate
-          data-on:submit={event("validate", opts: "{contentType: 'form'}")}
-          data-on:reset={event("reset")}
-          class="rounded-lg border border-zinc-800 bg-zinc-900 p-5 shadow-2xl shadow-zinc-950/50"
-        >
-          <input type="hidden" name="_csrf_token" value={Plug.CSRFProtection.get_csrf_token()} />
+        <.prose>
+          The form is a real <code class="font-mono text-sm">&lt;form&gt;</code>: Datastar posts it
+          with <code class="font-mono text-sm">contentType: 'form'</code>, so the server receives
+          ordinary form fields rather than signals. Validation runs server-side and the response
+          patches six separate fragments — the status badge, three field-feedback spans, the
+          validation panel and the payload panel — leaving the inputs themselves untouched. That is
+          why what you typed survives the round trip.
+        </.prose>
 
-          <div class="mb-6 flex items-start justify-between gap-4">
-            <div>
-              <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">
-                Form surface
-              </p>
-              <h2 class="mt-2 text-2xl font-semibold text-zinc-50">Create an access pass</h2>
-            </div>
-            <.status_badge intent={@intent} />
-          </div>
-
-          <div class="grid gap-4">
-            <.form_input
-              label="Email"
-              type="email"
-              name="email"
-              autocomplete="email"
-              placeholder="ada@example.com"
-              hint="Use an @example.com address."
-              field={@validation["email"]}
-              intent={@intent}
-              required
-            />
-            <.form_input
-              label="First name"
-              name="first_name"
-              autocomplete="given-name"
-              placeholder="Ada"
-              field={@validation["first_name"]}
-              intent={@intent}
-              minlength="2"
-              required
-            />
-            <.form_input
-              label="Last name"
-              name="last_name"
-              autocomplete="family-name"
-              placeholder="Lovelace"
-              field={@validation["last_name"]}
-              intent={@intent}
-              minlength="2"
-              required
-            />
-          </div>
-
-          <div class="mt-6 flex flex-wrap items-center gap-3">
-            <button
-              id="access-pass-submit"
-              type="submit"
-              class="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
-            >
-              <.icon name="hero-check-micro" class="size-4" /> Validate
-            </button>
-            <button
-              id="access-pass-reset"
-              type="reset"
-              class="inline-flex items-center gap-2 rounded-md border border-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:border-zinc-500 hover:bg-zinc-800 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
-            >
-              <.icon name="hero-arrow-path-micro" class="size-4" /> Reset
-            </button>
-          </div>
-
-          <.validation_panel validation={@validation} intent={@intent} />
-        </form>
-
-        <.payload_panel submitted={@submitted} />
-      </section>
+        <div class="mt-6">
+          <.code_block
+            language={@snippet.wiring_language}
+            label="lib/dstar_demo_web/pages/commands_page.ex"
+            code={@snippet.wiring}
+          />
+        </div>
+      </:how_it_works>
     </.demo_shell>
     """
   end
@@ -179,7 +199,7 @@ defmodule DstarDemoWeb.CommandsPage do
 
     ~H"""
     <label id={"access-pass-#{@name}-field"} class="block">
-      <span class="mb-2 block text-sm font-medium text-zinc-300">{@label}</span>
+      <span class="mb-2 block text-sm font-medium text-base-content/80">{@label}</span>
       <input
         id={@input_id}
         type={@type}
@@ -187,7 +207,7 @@ defmodule DstarDemoWeb.CommandsPage do
         autocomplete={@autocomplete}
         placeholder={@placeholder}
         aria-describedby={@feedback_id}
-        class="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-3 text-base text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-300/20"
+        class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-3 text-base text-base-content outline-none transition placeholder:text-base-content/45 focus:border-primary focus:ring-2 focus:ring-primary/20"
         {@rest}
       />
       <.field_feedback name={@name} hint={@hint} field={@field} intent={@intent} />
@@ -200,15 +220,20 @@ defmodule DstarDemoWeb.CommandsPage do
   attr :field, :map, required: true
   attr :intent, :string, required: true
 
+  # Feedback text stays monochrome on purpose. Every daisyUI semantic colour
+  # (success, error, …) clears 4.5:1 in exactly one of the two themes and fails
+  # in the other, and `dark:` cannot rescue it because "system" removes the
+  # data-theme attribute entirely. Weight carries the distinction instead; the
+  # tinted status badge and validation chips carry the hue.
   def field_feedback(assigns) do
     ~H"""
     <span
       id={"access-pass-#{@name}-feedback"}
       class={[
         "mt-2 block text-sm transition",
-        @intent == "idle" && "text-zinc-500",
-        @intent != "idle" && @field.valid && "text-emerald-300",
-        @intent == "rejected" && !@field.valid && "text-rose-300"
+        @intent == "idle" && "text-base-content/65",
+        @intent != "idle" && @field.valid && "text-base-content/70",
+        @intent == "rejected" && !@field.valid && "font-medium text-base-content"
       ]}
     >
       {field_feedback_message(@intent, @field, @hint)}
@@ -223,10 +248,10 @@ defmodule DstarDemoWeb.CommandsPage do
     <span
       id="form-status"
       class={[
-        "rounded-full px-3 py-1 text-xs font-medium",
-        @intent == "accepted" && "bg-emerald-300 text-zinc-950",
-        @intent == "rejected" && "bg-rose-400/15 text-rose-200",
-        @intent == "idle" && "bg-zinc-800 text-zinc-300"
+        "inline-flex items-center px-2 py-0.5 font-mono text-xs",
+        @intent == "accepted" && "bg-primary text-primary-content",
+        @intent == "rejected" && "bg-error/20 text-base-content",
+        @intent == "idle" && "bg-base-300 text-base-content/70"
       ]}
     >
       {status_label(@intent)}
@@ -240,22 +265,22 @@ defmodule DstarDemoWeb.CommandsPage do
     assigns = Map.put(assigns, :submitted?, map_size(assigns.submitted) > 0)
 
     ~H"""
-    <aside id="form-payload" class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-      <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">
+    <aside id="form-payload" class="border border-base-300 bg-base-100 p-4">
+      <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">
         Submitted form data
       </p>
-      <div :if={@submitted?} class="mt-4 space-y-3 text-sm text-zinc-300">
+      <div :if={@submitted?} class="mt-4 space-y-3 text-sm text-base-content/80">
         <div
           :for={name <- ~w(email first_name last_name)}
           class="flex items-center justify-between gap-3"
         >
           <span>{name}</span>
-          <code class="truncate rounded bg-zinc-900 px-2 py-1 text-emerald-200">
+          <code class="truncate bg-base-200 px-2 py-1 font-mono text-base-content">
             {Map.get(@submitted, name, "")}
           </code>
         </div>
       </div>
-      <p :if={!@submitted?} class="mt-4 text-sm leading-6 text-zinc-400">
+      <p :if={!@submitted?} class="mt-4 text-sm leading-6 text-base-content/70">
         No form data has reached the server yet.
       </p>
     </aside>
@@ -269,21 +294,21 @@ defmodule DstarDemoWeb.CommandsPage do
     assigns = Map.put(assigns, :ready?, ready?(assigns.validation))
 
     ~H"""
-    <div id="validation-panel" class="mt-6 rounded-md border border-zinc-800 bg-zinc-950 p-4">
+    <div id="validation-panel" class="mt-6 border border-base-300 bg-base-100 p-4">
       <div class="flex items-center justify-between gap-4">
-        <p class="text-sm font-semibold text-zinc-200">
+        <p class="text-sm font-semibold text-base-content">
           {validation_title(@intent, @ready?)}
         </p>
         <span class={[
-          "rounded-full px-2.5 py-1 text-xs font-semibold",
-          @intent == "accepted" && "bg-emerald-300 text-zinc-950",
-          @intent == "idle" && "bg-zinc-800 text-zinc-300",
-          @intent == "rejected" && "bg-rose-400/15 text-rose-200"
+          "inline-flex items-center px-2 py-0.5 font-mono text-xs",
+          @intent == "accepted" && "bg-primary text-primary-content",
+          @intent == "idle" && "bg-base-300 text-base-content/70",
+          @intent == "rejected" && "bg-error/20 text-base-content"
         ]}>
           {validation_count(@intent, @validation)}
         </span>
       </div>
-      <div class="mt-4 grid gap-2 text-sm text-zinc-400 sm:grid-cols-3">
+      <div class="mt-4 grid gap-2 text-sm text-base-content/70 sm:grid-cols-3">
         <.validation_chip label="email" field={@validation["email"]} intent={@intent} />
         <.validation_chip label="first" field={@validation["first_name"]} intent={@intent} />
         <.validation_chip label="last" field={@validation["last_name"]} intent={@intent} />
@@ -299,12 +324,11 @@ defmodule DstarDemoWeb.CommandsPage do
   def validation_chip(assigns) do
     ~H"""
     <div class={[
-      "rounded-md border px-3 py-2",
-      @field.valid && @intent != "idle" &&
-        "border-emerald-300/30 bg-emerald-300/10 text-emerald-100",
-      !@field.valid && @intent == "rejected" && "border-rose-400/30 bg-rose-400/10 text-rose-100",
+      "border px-3 py-2 text-base-content",
+      @field.valid && @intent != "idle" && "border-success/40 bg-success/10",
+      !@field.valid && @intent == "rejected" && "border-error/40 bg-error/10",
       (@intent == "idle" || (!@field.valid && @intent != "rejected")) &&
-        "border-zinc-800 bg-zinc-900 text-zinc-400"
+        "border-base-300 bg-base-200"
     ]}>
       <span class="font-medium">{@label}</span>
       <span class="mt-1 block text-xs opacity-80">{chip_message(@intent, @field)}</span>

@@ -88,11 +88,12 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
 
   @impl Dstar.Page
   def render(assigns) do
+    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:streaming_dashboard))
+
     ~H"""
     <.demo_shell
       active="Streaming Dashboard"
       title="Streaming dashboard"
-      eyebrow="SSE stream"
       summary="A bounded SSE loop sends live metrics and activity patches. Starting it again in the same tab replaces the prior stream."
       signals={
         %{
@@ -104,62 +105,82 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
         }
       }
     >
-      <:aside>
-        <.demo_facts items={[
+      <:demo>
+        <section
+          id="stream-dashboard"
+          data-on:online__window={connect(opts: "{retryMaxCount: 0}")}
+          class="grid gap-5"
+        >
+          <div class="flex flex-wrap items-center justify-between gap-3 border border-base-300 bg-base-200 p-4">
+            <div>
+              <p class="text-sm font-semibold text-base-content">Live operations lane</p>
+              <p class="mt-1 text-sm text-base-content/70">
+                Bounded demo stream, safe to restart repeatedly.
+              </p>
+            </div>
+            <button
+              id="start-stream"
+              data-on:click={connect(opts: "{retryMaxCount: 0}")}
+              class="inline-flex items-center gap-2 rounded-md border border-primary bg-primary px-4 py-2.5 text-sm font-medium text-primary-content transition hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            >
+              <.icon name="hero-play-micro" class="size-4" /> Start stream
+            </button>
+          </div>
+
+          <div id="metric-grid" class="grid gap-3 md:grid-cols-3">
+            <.metric_tile
+              id="metric-throughput"
+              title="Throughput"
+              value={"#{@throughput}/min"}
+              detail="ingested events"
+              tone="good"
+            />
+            <.metric_tile
+              id="metric-latency"
+              title="Latency"
+              value={"#{@latency} ms"}
+              detail="edge to patch"
+              tone="info"
+            />
+            <.metric_tile
+              id="metric-progress"
+              title="Progress"
+              value={"#{@progress}%"}
+              detail={"stream #{@streamStatus}"}
+              tone="warn"
+            />
+          </div>
+
+          <.stream_frame tick={@tick} status={@streamStatus} />
+        </section>
+      </:demo>
+
+      <:how_it_works>
+        <.key_points items={[
           "connect/1 posts to the page path and opens the stream.",
           "stream_key/1 deduplicates by demo scope plus tabId.",
           "handle_info/2 receives ticks from the library-owned loop.",
           "Metric tiles and activity rows are patched independently."
         ]} />
-      </:aside>
 
-      <section
-        id="stream-dashboard"
-        data-on:online__window={connect(opts: "{retryMaxCount: 0}")}
-        class="grid gap-5"
-      >
-        <div class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <div>
-            <p class="text-sm font-semibold text-zinc-100">Live operations lane</p>
-            <p class="mt-1 text-sm text-zinc-500">
-              Bounded demo stream, safe to restart repeatedly.
-            </p>
-          </div>
-          <button
-            id="start-stream"
-            data-on:click={connect(opts: "{retryMaxCount: 0}")}
-            class="inline-flex items-center gap-2 rounded-md bg-emerald-300 px-4 py-2.5 text-sm font-semibold text-zinc-950 transition hover:bg-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
-          >
-            <.icon name="hero-play-micro" class="size-4" /> Start stream
-          </button>
-        </div>
+        <.prose>
+          <code class="font-mono text-sm">connect/1</code>
+          posts to the page path and <code class="font-mono text-sm">Dstar.Page.Plug</code>
+          opens a server-sent event stream, then owns the receive loop.
+          <code class="font-mono text-sm">stream_key/1</code>
+          registers it per demo scope plus tab, so starting it again in the same tab replaces the
+          old stream instead of running two. Each tick patches the three metric tiles and prepends
+          one activity row; the final tick returns <code class="font-mono text-sm">{"{:halt, conn}"}</code>.
+        </.prose>
 
-        <div id="metric-grid" class="grid gap-3 md:grid-cols-3">
-          <.metric_tile
-            id="metric-throughput"
-            title="Throughput"
-            value={"#{@throughput}/min"}
-            detail="ingested events"
-            tone="good"
-          />
-          <.metric_tile
-            id="metric-latency"
-            title="Latency"
-            value={"#{@latency} ms"}
-            detail="edge to patch"
-            tone="info"
-          />
-          <.metric_tile
-            id="metric-progress"
-            title="Progress"
-            value={"#{@progress}%"}
-            detail={"stream #{@streamStatus}"}
-            tone="warn"
+        <div class="mt-6">
+          <.code_block
+            language={@snippet.wiring_language}
+            label="lib/dstar_demo_web/pages/streaming_dashboard_page.ex"
+            code={@snippet.wiring}
           />
         </div>
-
-        <.stream_frame tick={@tick} status={@streamStatus} />
-      </section>
+      </:how_it_works>
     </.demo_shell>
     """
   end
@@ -170,11 +191,11 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
   def stream_frame(assigns) do
     ~H"""
     <div id="stream-frame" class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-      <section class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
+      <section class="border border-base-300 bg-base-200 p-4">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-sm font-semibold text-zinc-100">Activity stream</p>
-            <p class="mt-1 text-xs text-zinc-500">latest tick: {@tick}</p>
+            <p class="text-sm font-semibold text-base-content">Activity stream</p>
+            <p class="mt-1 font-mono text-xs text-base-content/65">latest tick: {@tick}</p>
           </div>
           <.pill label={@status} tone={if(@status == "complete", do: "good", else: "info")} />
         </div>
@@ -184,11 +205,11 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
         </div>
       </section>
 
-      <aside class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-        <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">
+      <aside class="border border-base-300 bg-base-100 p-4">
+        <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">
           Deduplication
         </p>
-        <p class="mt-3 text-sm leading-6 text-zinc-400">
+        <p class="mt-3 text-sm leading-6 text-base-content/70">
           The body exposes a per-tab signal named tabId. stream_key/1 registers this
           connection and replaces any older stream for the same tab.
         </p>
@@ -213,11 +234,11 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
     ~H"""
     <div
       id={"activity-#{@tick}"}
-      class="flex items-center justify-between gap-3 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2"
+      class="flex items-center justify-between gap-3 border border-base-300 bg-base-100 px-3 py-2"
     >
       <div class="min-w-0">
-        <p class="truncate text-sm font-medium text-zinc-100">Patch cycle {@tick} {@phase}</p>
-        <p class="text-xs text-zinc-500">server-sent event delivered to this tab</p>
+        <p class="truncate text-sm font-medium text-base-content">Patch cycle {@tick} {@phase}</p>
+        <p class="text-xs text-base-content/65">server-sent event delivered to this tab</p>
       </div>
       <.pill label={"t+#{@tick}"} tone={@severity} />
     </div>

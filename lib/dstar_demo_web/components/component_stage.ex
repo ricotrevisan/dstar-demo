@@ -37,32 +37,32 @@ defmodule DstarDemoWeb.ComponentStage do
 
   def profile_card(assigns) do
     ~H"""
-    <section class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <section class="border border-base-300 bg-base-100 p-4">
       <div class="flex flex-wrap items-center justify-between gap-4">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="grid size-11 shrink-0 place-items-center rounded-md bg-emerald-300 text-zinc-950">
+          <div class="grid size-11 shrink-0 place-items-center bg-primary text-primary-content">
             <.icon name="hero-user" class="size-5" />
           </div>
           <div class="min-w-0">
-            <h2 class="truncate text-base font-semibold text-zinc-100">Ada Lovelace</h2>
-            <p class="text-sm text-zinc-500">Release coordinator · Dstar lab</p>
+            <h2 class="truncate text-base font-semibold text-base-content">Ada Lovelace</h2>
+            <p class="text-sm text-base-content/70">Release coordinator · Dstar lab</p>
           </div>
         </div>
         <.pill label={"render #{@render_count}"} tone="info" />
       </div>
 
       <dl class="mt-5 grid gap-3 sm:grid-cols-3">
-        <div class="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2">
-          <dt class="text-xs text-zinc-500">Open commands</dt>
-          <dd class="mt-1 text-lg font-semibold text-zinc-100">7</dd>
+        <div class="border border-base-300 bg-base-200 px-3 py-2">
+          <dt class="font-mono text-xs text-base-content/65">Open commands</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums text-base-content">7</dd>
         </div>
-        <div class="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2">
-          <dt class="text-xs text-zinc-500">Patch latency</dt>
-          <dd class="mt-1 text-lg font-semibold text-zinc-100">34 ms</dd>
+        <div class="border border-base-300 bg-base-200 px-3 py-2">
+          <dt class="font-mono text-xs text-base-content/65">Patch latency</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums text-base-content">34 ms</dd>
         </div>
-        <div class="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2">
-          <dt class="text-xs text-zinc-500">Signal scope</dt>
-          <dd class="mt-1 text-lg font-semibold text-zinc-100">tab</dd>
+        <div class="border border-base-300 bg-base-200 px-3 py-2">
+          <dt class="font-mono text-xs text-base-content/65">Signal scope</dt>
+          <dd class="mt-1 text-lg font-semibold text-base-content">tab</dd>
         </div>
       </dl>
     </section>
@@ -73,9 +73,9 @@ defmodule DstarDemoWeb.ComponentStage do
 
   def timeline_panel(assigns) do
     ~H"""
-    <section class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <section class="border border-base-300 bg-base-100 p-4">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-base font-semibold text-zinc-100">Patch timeline</h2>
+        <h2 class="text-base font-semibold text-base-content">Patch timeline</h2>
         <.pill label={"render #{@render_count}"} tone="info" />
       </div>
       <ol class="mt-4 space-y-2">
@@ -87,10 +87,10 @@ defmodule DstarDemoWeb.ComponentStage do
               {"Target patched", "warn"}
             ]
           }
-          class="flex items-center gap-3 rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2"
+          class="flex items-center gap-3 border border-base-300 bg-base-200 px-3 py-2"
         >
           <.pill label={tone} tone={tone} />
-          <span class="text-sm text-zinc-200">{label}</span>
+          <span class="text-sm text-base-content/80">{label}</span>
         </li>
       </ol>
     </section>
@@ -101,19 +101,19 @@ defmodule DstarDemoWeb.ComponentStage do
 
   def deploy_summary(assigns) do
     ~H"""
-    <section class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <section class="border border-base-300 bg-base-100 p-4">
       <div class="flex items-center justify-between gap-3">
-        <h2 class="text-base font-semibold text-zinc-100">Deploy summary</h2>
+        <h2 class="text-base font-semibold text-base-content">Deploy summary</h2>
         <.pill label={"render #{@render_count}"} tone="info" />
       </div>
       <div class="mt-4 grid gap-3 md:grid-cols-2">
-        <div class="rounded-md border border-emerald-300/30 bg-emerald-300/10 p-3">
-          <p class="text-sm font-semibold text-emerald-100">Ready to patch</p>
-          <p class="mt-1 text-sm text-emerald-200/80">HEEx returned safe iodata for Dstar.</p>
+        <div class="border border-success/40 bg-success/10 p-3">
+          <p class="text-sm font-semibold text-base-content">Ready to patch</p>
+          <p class="mt-1 text-sm text-base-content/80">HEEx returned safe iodata for Dstar.</p>
         </div>
-        <div class="rounded-md border border-sky-300/30 bg-sky-300/10 p-3">
-          <p class="text-sm font-semibold text-sky-100">Stable selector</p>
-          <p class="mt-1 text-sm text-sky-200/80">#component-stage receives the update.</p>
+        <div class="border border-info/40 bg-info/10 p-3">
+          <p class="text-sm font-semibold text-base-content">Stable selector</p>
+          <p class="mt-1 text-sm text-base-content/80">#component-stage receives the update.</p>
         </div>
       </div>
     </section>

@@ -70,7 +70,11 @@ defmodule DstarDemoWeb.PagesTest do
         |> get(path)
         |> html_response(200)
 
-      ids = Regex.scan(~r/id="([^"]+)"/, response, capture: :all_but_first) |> List.flatten()
+      # Anchored on the preceding whitespace so this matches a real `id`
+      # attribute and not the tail of another attribute's name. Makeup emits
+      # `data-group-id="hl-1"` on both halves of a matching delimiter pair —
+      # deliberately repeated, and not a DOM id at all.
+      ids = Regex.scan(~r/\sid="([^"]+)"/, response, capture: :all_but_first) |> List.flatten()
       duplicate_ids = ids -- Enum.uniq(ids)
 
       assert duplicate_ids == [],
@@ -341,6 +345,80 @@ defmodule DstarDemoWeb.PagesTest do
     assert_patched_signals(conn, %{script_runs: 1, last_script_action: "redirect"})
     assert sse_body(conn) =~ "/scripts?redirected=1"
     assert sse_body(conn) =~ ~s(data-demo-script="redirect")
+  end
+
+  test "demo pages render the documentation shell", %{conn: conn} do
+    for {path, _marker} <- demo_pages() do
+      response = conn |> recycle() |> get(path) |> html_response(200)
+
+      # Persistent sidebar, listing every demo, on every page.
+      assert response =~ ~s[aria-label="Demos"]
+      assert response =~ ~s[href="/commands"]
+      assert response =~ ~s[href="/presence"]
+
+      # The three documentation sections, and the jump links to them.
+      assert response =~ ~s[id="demo"]
+      assert response =~ ~s[id="how-it-works"]
+      assert response =~ ~s[href="#demo"]
+      assert response =~ ~s[href="#how-it-works"]
+      assert response =~ "How it works"
+
+      # Sub-lg nav is a disclosure, not a drawer — no JavaScript involved.
+      assert response =~ "<details"
+    end
+  end
+
+  test "jump links are derived from the slots a page actually passes", %{conn: conn} do
+    # No page has a :comparison slot yet, so no page advertises one.
+    for {path, _marker} <- demo_pages() do
+      response = conn |> recycle() |> get(path) |> html_response(200)
+
+      refute response =~ ~s[href="#comparison"]
+      refute response =~ ~s[id="comparison"]
+    end
+  end
+
+  # /components is deliberately absent: its dropped eyebrow was
+  # "Dstar.Component", which is also a substring of the page's first key point
+  # ("ComponentStage is a Dstar.Component: UI plus handle_event/3."). That
+  # sentence is real page content the next test asserts, so the string cannot
+  # double as a tombstone for the eyebrow.
+  test "the dropped eyebrow no longer renders anywhere", %{conn: conn} do
+    for {path, eyebrow} <- [
+          {~p"/commands", "Form Data"},
+          {~p"/search", "Signal search"},
+          {~p"/streaming", "SSE stream"},
+          {~p"/patch-lab", "DOM patch modes"},
+          {~p"/signals", "Inspector"},
+          {~p"/scripts", "Client actions"}
+        ] do
+      response = conn |> recycle() |> get(path) |> html_response(200)
+      refute response =~ eyebrow
+    end
+  end
+
+  test "each page's facts survive as key points inside How it works", %{conn: conn} do
+    for {path, fact} <- [
+          {~p"/commands", "novalidate keeps the browser from intercepting the demo."},
+          {~p"/search", "data-bind keeps the query and segment on the client."},
+          {~p"/streaming", "connect/1 posts to the page path and opens the stream."},
+          {~p"/patch-lab", "outer replaces the target node."},
+          {~p"/components", "ComponentStage is a Dstar.Component: UI plus handle_event/3."},
+          {~p"/signals", "handle_event/3 receives the request signals already read."},
+          {~p"/scripts", "execute_script/3 appends a script tag through a patch."}
+        ] do
+      response = conn |> recycle() |> get(path) |> html_response(200)
+      assert response =~ fact
+    end
+  end
+
+  test "each page renders a highlighted wiring snippet", %{conn: conn} do
+    for {path, _marker} <- demo_pages() do
+      response = conn |> recycle() |> get(path) |> html_response(200)
+      # Makeup emits token spans; the .hl wrapper carries our token colours.
+      assert response =~ ~s[class="hl min-w-0"]
+      assert response =~ ~s[<span class="]
+    end
   end
 
   defp demo_pages do

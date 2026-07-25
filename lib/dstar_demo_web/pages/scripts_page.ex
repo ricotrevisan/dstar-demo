@@ -13,25 +13,17 @@ defmodule DstarDemoWeb.ScriptsPage do
 
   @impl Dstar.Page
   def render(assigns) do
+    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:scripts))
+
     ~H"""
     <.demo_shell
       active="Scripts"
       title="Script helpers"
-      eyebrow="Client actions"
       summary="Dstar can append safe script actions over SSE for one-off browser effects, console diagnostics, and redirects."
       signals={%{script_runs: @script_runs, last_script_action: @last_script_action}}
     >
-      <:aside>
-        <.demo_facts items={[
-          "execute_script/3 appends a script tag through a patch.",
-          "console_log/3 emits structured browser console output.",
-          "redirect/3 performs a server-commanded navigation.",
-          "The helper scripts stay inert after they execute."
-        ]} />
-      </:aside>
-
-      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+      <:demo>
+        <section class="border border-base-300 bg-base-200 p-5">
           <div class="flex flex-wrap gap-2">
             <.action_button
               id="script-execute"
@@ -55,18 +47,35 @@ defmodule DstarDemoWeb.ScriptsPage do
           </div>
 
           <.script_log script_runs={@script_runs} last_script_action={@last_script_action} />
-        </div>
+        </section>
+      </:demo>
 
-        <aside class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">
-            Secondary helper lane
-          </p>
-          <p class="mt-3 text-sm leading-6 text-zinc-400">
-            These helpers are useful for focused client effects. The main demos avoid them so the
-            server-rendered patch flow stays easy to inspect.
-          </p>
-        </aside>
-      </section>
+      <:how_it_works>
+        <.key_points items={[
+          "execute_script/3 appends a script tag through a patch.",
+          "console_log/3 emits structured browser console output.",
+          "redirect/3 performs a server-commanded navigation.",
+          "The helper scripts stay inert after they execute."
+        ]} />
+
+        <.prose>
+          These three helpers append a one-shot <code class="font-mono text-sm">&lt;script&gt;</code>
+          through a patch: <code class="font-mono text-sm">execute_script/3</code>
+          runs browser code, <code class="font-mono text-sm">console_log/3</code>
+          emits a structured console entry, and <code class="font-mono text-sm">redirect/3</code>
+          commands a navigation. <code class="font-mono text-sm">auto_remove: false</code>
+          leaves the tag in the DOM after it has run, so you can go and look at it. The other demos
+          avoid these helpers so the server-rendered patch flow stays easy to inspect.
+        </.prose>
+
+        <div class="mt-6">
+          <.code_block
+            language={@snippet.wiring_language}
+            label="lib/dstar_demo_web/pages/scripts_page.ex"
+            code={@snippet.wiring}
+          />
+        </div>
+      </:how_it_works>
     </.demo_shell>
     """
   end
@@ -112,30 +121,30 @@ defmodule DstarDemoWeb.ScriptsPage do
 
   def script_log(assigns) do
     ~H"""
-    <div id="script-log" class="mt-5 rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+    <div id="script-log" class="mt-5 border border-base-300 bg-base-100 p-4">
       <div class="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p class="text-sm font-semibold text-zinc-100">Helper log</p>
-          <p class="mt-1 text-xs text-zinc-500">
+          <p class="text-sm font-semibold text-base-content">Helper log</p>
+          <p class="mt-1 font-mono text-xs text-base-content/65">
             Last action:
             <span id="script-last-action" data-text="$last_script_action">
               {@last_script_action}
             </span>
           </p>
         </div>
-        <span class="inline-flex items-center rounded-full bg-sky-300/15 px-2.5 py-1 text-xs font-semibold text-sky-200">
+        <span class="inline-flex items-center bg-info/20 px-2 py-0.5 font-mono text-xs text-base-content">
           runs <span id="script-run-count" class="ml-1" data-text="$script_runs">{@script_runs}</span>
         </span>
       </div>
 
-      <div class="mt-4 grid gap-2 text-sm text-zinc-300">
-        <div class="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2">
+      <div class="mt-4 grid gap-2 text-sm text-base-content/80">
+        <div class="border border-base-300 bg-base-200 px-3 py-2">
           execute_script mutates a data attribute through an appended script.
         </div>
-        <div class="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2">
+        <div class="border border-base-300 bg-base-200 px-3 py-2">
           console_log writes a structured object in the browser console.
         </div>
-        <div class="rounded-md border border-zinc-800 bg-zinc-900 px-3 py-2">
+        <div class="border border-base-300 bg-base-200 px-3 py-2">
           redirect navigates back to this page with a query flag.
         </div>
       </div>

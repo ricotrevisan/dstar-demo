@@ -55,32 +55,26 @@ defmodule DstarDemoWeb.ActiveSearchPage do
 
   @impl Dstar.Page
   def render(assigns) do
+    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:active_search))
+
     ~H"""
     <.demo_shell
       active="Active Search"
       title="Active search"
-      eyebrow="Signal search"
       summary="Typing changes Datastar signals, the server filters local data, and only the result panel is patched back."
       signals={%{query: @query, segment: @segment}}
     >
-      <:aside>
-        <.demo_facts items={[
-          "data-bind keeps the query and segment on the client.",
-          "Typing posts a page event with the latest signals.",
-          "Only #search-results is patched, not the input chrome.",
-          "Empty and no-results states are server-rendered."
-        ]} />
-      </:aside>
-
-      <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-5">
+      <:demo>
+        <section class="border border-base-300 bg-base-200 p-5">
           <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <label class="block min-w-0 flex-1">
-              <span class="mb-2 block text-sm font-medium text-zinc-300">Search inventory</span>
+              <span class="mb-2 block text-sm font-medium text-base-content/80">
+                Search inventory
+              </span>
               <div class="relative">
                 <.icon
                   name="hero-magnifying-glass"
-                  class="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-zinc-500"
+                  class="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-base-content/45"
                 />
                 <input
                   id="search-query"
@@ -90,7 +84,7 @@ defmodule DstarDemoWeb.ActiveSearchPage do
                   value={@query}
                   placeholder="Try stream, patch, signal, or owner names"
                   autocomplete="off"
-                  class="w-full rounded-md border border-zinc-700 bg-zinc-950 py-3 pr-3 pl-10 text-base text-zinc-100 outline-none transition placeholder:text-zinc-600 focus:border-emerald-300"
+                  class="w-full rounded-md border border-base-300 bg-base-100 py-3 pr-3 pl-10 text-base text-base-content outline-none transition placeholder:text-base-content/45 focus:border-primary"
                 />
               </div>
             </label>
@@ -102,10 +96,11 @@ defmodule DstarDemoWeb.ActiveSearchPage do
                 data-indicator="_searchPending"
                 data-on:click={"$segment = '#{segment}'; #{event("search")}"}
                 class={[
-                  "rounded-md px-3 py-2 text-sm font-semibold capitalize transition focus:outline-none focus:ring-2 focus:ring-emerald-300/60",
-                  @segment == segment && "bg-emerald-300 text-zinc-950",
+                  "rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/40",
+                  @segment == segment && "border-primary bg-primary text-primary-content",
                   @segment != segment &&
-                    "border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800"
+                    "border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100"
                 ]}
               >
                 {segment}
@@ -115,7 +110,7 @@ defmodule DstarDemoWeb.ActiveSearchPage do
 
           <div
             data-show="$_searchPending"
-            class="mt-5 rounded-md border border-sky-300/20 bg-sky-300/10 px-3 py-2 text-sm text-sky-100"
+            class="mt-5 border border-info/30 bg-info/10 px-3 py-2 text-sm text-base-content"
           >
             Updating results
           </div>
@@ -126,19 +121,35 @@ defmodule DstarDemoWeb.ActiveSearchPage do
             segment={@segment}
             result_count={@result_count}
           />
-        </div>
+        </section>
+      </:demo>
 
-        <aside class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-          <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">
-            Patched area
-          </p>
-          <p class="mt-3 text-sm leading-6 text-zinc-400">
-            The input, segment buttons, and page shell stay put while Dstar morphs the result
-            panel. The pending marker is a client-local indicator signal Datastar toggles around
-            each request — it clears even if the request fails.
-          </p>
-        </aside>
-      </section>
+      <:how_it_works>
+        <.key_points items={[
+          "data-bind keeps the query and segment on the client.",
+          "Typing posts a page event with the latest signals.",
+          "Only #search-results is patched, not the input chrome.",
+          "Empty and no-results states are server-rendered."
+        ]} />
+
+        <.prose>
+          <code class="font-mono text-sm">data-bind:query</code>
+          keeps the query on the client, and
+          <code class="font-mono text-sm">data-on:input__debounce.240ms</code>
+          posts a page event with the current signals 240ms after you stop typing. The handler
+          filters and patches <code class="font-mono text-sm">#search-results</code>
+          alone — and deliberately does not echo the query back, because a patch landing while you
+          are still typing would clobber the input.
+        </.prose>
+
+        <div class="mt-6">
+          <.code_block
+            language={@snippet.wiring_language}
+            label="lib/dstar_demo_web/pages/active_search_page.ex"
+            code={@snippet.wiring}
+          />
+        </div>
+      </:how_it_works>
     </.demo_shell>
     """
   end
@@ -166,42 +177,44 @@ defmodule DstarDemoWeb.ActiveSearchPage do
 
   def result_panel(assigns) do
     ~H"""
-    <div id="search-results" class="mt-5 rounded-md border border-zinc-800 bg-zinc-950">
-      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3">
+    <div id="search-results" class="mt-5 border border-base-300 bg-base-100">
+      <div class="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 px-4 py-3">
         <div>
-          <p class="text-sm font-semibold text-zinc-100">{@result_count} matches</p>
-          <p class="text-xs text-zinc-500">
+          <p class="text-sm font-semibold text-base-content">{@result_count} matches</p>
+          <p class="font-mono text-xs text-base-content/65">
             query: {if @query == "", do: "empty", else: @query} · segment: {@segment}
           </p>
         </div>
         <.pill label="server patch" tone="info" />
       </div>
 
-      <div class="divide-y divide-zinc-800">
+      <div class="divide-y divide-base-300">
         <div :if={@query == "" and @segment == "all"} class="px-4 py-8">
-          <p class="text-sm font-semibold text-zinc-100">Start typing to narrow the inventory.</p>
-          <p class="mt-1 text-sm text-zinc-500">
+          <p class="text-sm font-semibold text-base-content">
+            Start typing to narrow the inventory.
+          </p>
+          <p class="mt-1 text-sm text-base-content/65">
             The first render still shows the full local dataset so there is something real to scan.
           </p>
         </div>
 
         <div :if={@results == []} class="px-4 py-8">
-          <p class="text-sm font-semibold text-zinc-100">No matching records.</p>
-          <p class="mt-1 text-sm text-zinc-500">
+          <p class="text-sm font-semibold text-base-content">No matching records.</p>
+          <p class="mt-1 text-sm text-base-content/65">
             Try a broader term or switch the segment back to all.
           </p>
         </div>
 
-        <article :for={item <- @results} class="px-4 py-3 transition hover:bg-zinc-900/80">
+        <article :for={item <- @results} class="px-4 py-3 transition hover:bg-base-200">
           <div class="flex flex-wrap items-start justify-between gap-3">
             <div class="min-w-0">
-              <h2 class="truncate text-sm font-semibold text-zinc-100">{item.name}</h2>
-              <p class="mt-1 text-xs text-zinc-500">{item.type} · {item.owner}</p>
+              <h2 class="truncate text-sm font-semibold text-base-content">{item.name}</h2>
+              <p class="mt-1 text-xs text-base-content/65">{item.type} · {item.owner}</p>
             </div>
             <div class="flex flex-wrap gap-1">
               <span
                 :for={tag <- item.tags}
-                class="rounded bg-zinc-900 px-2 py-1 text-xs text-zinc-400"
+                class="bg-base-200 px-2 py-1 font-mono text-xs text-base-content/70"
               >
                 {tag}
               </span>

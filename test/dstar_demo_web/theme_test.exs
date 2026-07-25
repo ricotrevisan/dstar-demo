@@ -106,8 +106,11 @@ defmodule DstarDemoWeb.ThemeTest do
 
   defp require_index(haystack, needle, description) do
     case :binary.match(haystack, needle) do
-      {index, _length} -> index
-      :nomatch -> flunk("expected to find #{description} (#{inspect(needle)}) in the compiled CSS")
+      {index, _length} ->
+        index
+
+      :nomatch ->
+        flunk("expected to find #{description} (#{inspect(needle)}) in the compiled CSS")
     end
   end
 end

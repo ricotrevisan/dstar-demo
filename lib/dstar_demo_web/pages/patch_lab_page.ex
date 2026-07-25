@@ -10,91 +10,117 @@ defmodule DstarDemoWeb.PatchLabPage do
 
   @impl Dstar.Page
   def render(assigns) do
-    assigns = Map.put(assigns, :modes, @modes)
+    assigns =
+      assigns
+      |> Map.put(:modes, @modes)
+      |> Map.put(:snippet, DstarDemoWeb.Snippets.fetch!(:patch_lab))
 
     ~H"""
     <.demo_shell
       active="Patch Lab"
       title="Patch lab"
-      eyebrow="DOM patch modes"
       summary="Each control sends a page event that uses a different Datastar patch mode. The target area makes insertion, replacement, and removal explicit."
       signals={%{selected_mode: @selected_mode, patch_count: @patch_count}}
     >
-      <:aside>
-        <.demo_facts items={[
+      <:demo>
+        <section class="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+          <div class="border border-base-300 bg-base-200 p-4">
+            <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">Modes</p>
+            <div class="mt-4 grid gap-2">
+              <button
+                :for={mode <- @modes}
+                id={"patch-mode-#{mode}"}
+                data-on:click={"$selected_mode = '#{mode}'; #{event(mode)}"}
+                data-class={mode_classes(mode)}
+                class={[
+                  "flex items-center justify-between rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
+                  "focus:outline-none focus:ring-2 focus:ring-primary/40",
+                  @selected_mode == mode && "border-primary bg-primary text-primary-content",
+                  @selected_mode != mode &&
+                    "border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100"
+                ]}
+              >
+                <span>{mode}</span>
+                <.icon name="hero-arrow-right-micro" class="size-4" />
+              </button>
+            </div>
+          </div>
+
+          <div class="min-w-0 border border-base-300 bg-base-200 p-5">
+            <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p class="text-sm font-semibold text-base-content">Patch target</p>
+                <p class="mt-1 font-mono text-xs text-base-content/65">
+                  Count: <span data-text="$patch_count">{@patch_count}</span>
+                  · mode: <span data-text="$selected_mode">{@selected_mode}</span>
+                </p>
+              </div>
+              <.pill label="Datastar patch-elements" tone="info" />
+            </div>
+
+            <.patch_status selected_mode={@selected_mode} patch_count={@patch_count} />
+
+            <div id="lab-stage" class="border border-base-300 bg-base-100 p-4">
+              <div id="before-zone" class="space-y-2"></div>
+              <div id="lab-target" class="border border-primary/40 bg-primary/10 p-4">
+                <p class="text-sm font-semibold text-base-content">Target node</p>
+                <p id="target-copy" class="mt-1 text-sm text-base-content/70">
+                  Inner content starts here.
+                </p>
+                <div id="patch-list" class="mt-4 grid gap-2">
+                  <div id="seed-row" class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
+                    Seed row
+                  </div>
+                </div>
+              </div>
+              <div
+                id="anchor-row"
+                class="my-3 border border-info/30 bg-info/10 px-3 py-2 text-sm text-base-content"
+              >
+                Sibling anchor for before and after
+              </div>
+              <div
+                id="removable-note"
+                class="border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-base-content"
+              >
+                Remove mode deletes this note.
+              </div>
+              <div id="after-zone" class="space-y-2"></div>
+            </div>
+          </div>
+        </section>
+      </:demo>
+
+      <:how_it_works>
+        <.key_points items={[
           "outer replaces the target node.",
           "inner replaces only target contents.",
           "append and prepend add children to a list.",
           "before and after insert siblings around an anchor.",
           "remove deletes the selected element."
         ]} />
-      </:aside>
 
-      <section class="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-        <div class="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-          <p class="text-xs font-semibold tracking-[0.16em] text-zinc-500 uppercase">Modes</p>
-          <div class="mt-4 grid gap-2">
-            <button
-              :for={mode <- @modes}
-              id={"patch-mode-#{mode}"}
-              data-on:click={"$selected_mode = '#{mode}'; #{event(mode)}"}
-              data-class={mode_classes(mode)}
-              class={[
-                "flex items-center justify-between rounded-md px-3 py-2 text-sm font-semibold capitalize transition focus:outline-none focus:ring-2 focus:ring-emerald-300/60",
-                @selected_mode == mode && "bg-emerald-300 text-zinc-950",
-                @selected_mode != mode &&
-                  "border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800"
-              ]}
-            >
-              <span>{mode}</span>
-              <.icon name="hero-arrow-right-micro" class="size-4" />
-            </button>
-          </div>
+        <.prose>
+          Every control posts a page event whose handler picks a different Datastar patch mode.
+          <code class="font-mono text-sm">mode: :outer</code>
+          swaps the target node, <code class="font-mono text-sm">:inner</code>
+          only its children, <code class="font-mono text-sm">:append</code>
+          and <code class="font-mono text-sm">:prepend</code>
+          add list items, <code class="font-mono text-sm">:before</code>
+          and <code class="font-mono text-sm">:after</code>
+          insert siblings around an anchor, and
+          <code class="font-mono text-sm">remove_elements/2</code>
+          deletes outright. The selector and the mode are the whole API.
+        </.prose>
+
+        <div class="mt-6">
+          <.code_block
+            language={@snippet.wiring_language}
+            label="lib/dstar_demo_web/pages/patch_lab_page.ex"
+            code={@snippet.wiring}
+          />
         </div>
-
-        <div class="min-w-0 rounded-lg border border-zinc-800 bg-zinc-900 p-5">
-          <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p class="text-sm font-semibold text-zinc-100">Patch target</p>
-              <p class="mt-1 text-xs text-zinc-500">
-                Count: <span data-text="$patch_count">{@patch_count}</span>
-                · mode: <span data-text="$selected_mode">{@selected_mode}</span>
-              </p>
-            </div>
-            <.pill label="Datastar patch-elements" tone="info" />
-          </div>
-
-          <.patch_status selected_mode={@selected_mode} patch_count={@patch_count} />
-
-          <div id="lab-stage" class="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
-            <div id="before-zone" class="space-y-2"></div>
-            <div id="lab-target" class="rounded-md border border-emerald-300/30 bg-emerald-300/10 p-4">
-              <p class="text-sm font-semibold text-emerald-100">Target node</p>
-              <p id="target-copy" class="mt-1 text-sm text-emerald-200/80">
-                Inner content starts here.
-              </p>
-              <div id="patch-list" class="mt-4 grid gap-2">
-                <div id="seed-row" class="rounded-md bg-zinc-900 px-3 py-2 text-sm text-zinc-300">
-                  Seed row
-                </div>
-              </div>
-            </div>
-            <div
-              id="anchor-row"
-              class="my-3 rounded-md border border-sky-300/30 bg-sky-300/10 px-3 py-2 text-sm text-sky-100"
-            >
-              Sibling anchor for before and after
-            </div>
-            <div
-              id="removable-note"
-              class="rounded-md border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-sm text-amber-100"
-            >
-              Remove mode deletes this note.
-            </div>
-            <div id="after-zone" class="space-y-2"></div>
-          </div>
-        </div>
-      </section>
+      </:how_it_works>
     </.demo_shell>
     """
   end
@@ -108,8 +134,8 @@ defmodule DstarDemoWeb.PatchLabPage do
   # Keeps the mode buttons' highlight in sync with the $selected_mode
   # signal after events; the server only renders the initial state.
   defp mode_classes(mode) do
-    "{'bg-emerald-300 text-zinc-950': $selected_mode === '#{mode}', " <>
-      "'border border-zinc-700 text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800': $selected_mode !== '#{mode}'}"
+    "{'border-primary bg-primary text-primary-content': $selected_mode === '#{mode}', " <>
+      "'border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100': $selected_mode !== '#{mode}'}"
   end
 
   attr :selected_mode, :string, required: true
@@ -119,10 +145,10 @@ defmodule DstarDemoWeb.PatchLabPage do
     ~H"""
     <div
       id="patch-status"
-      class="mb-4 rounded-md border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm text-zinc-300"
+      class="mb-4 border border-base-300 bg-base-100 px-3 py-2 text-sm text-base-content/80"
     >
-      Last patch used <span class="font-semibold text-emerald-200">{@selected_mode}</span>
-      mode at count <span class="font-semibold text-zinc-100">{@patch_count}</span>.
+      Last patch used <span class="font-mono font-semibold text-base-content">{@selected_mode}</span>
+      mode at count <span class="font-mono font-semibold text-base-content">{@patch_count}</span>.
     </div>
     """
   end
@@ -134,7 +160,7 @@ defmodule DstarDemoWeb.PatchLabPage do
     ~H"""
     <div
       id={"patch-item-#{@mode}-#{@count}"}
-      class="rounded-md border border-emerald-300/30 bg-emerald-300/10 px-3 py-2 text-sm text-emerald-100"
+      class="border border-primary/40 bg-primary/10 px-3 py-2 text-sm text-base-content"
     >
       {@mode} patch #{@count}
     </div>
@@ -156,7 +182,7 @@ defmodule DstarDemoWeb.PatchLabPage do
       "inner" ->
         patch_elements(
           conn,
-          ~s(<p class="text-sm font-semibold text-emerald-100">Inner patch #{count}</p><p class="mt-1 text-sm text-emerald-200/80">Only the children changed.</p>),
+          ~s(<p class="text-sm font-semibold text-base-content">Inner patch #{count}</p><p class="mt-1 text-sm text-base-content/70">Only the children changed.</p>),
           selector: "#lab-target",
           mode: :inner
         )
@@ -192,14 +218,11 @@ defmodule DstarDemoWeb.PatchLabPage do
 
   defp lab_target(assigns) do
     ~H"""
-    <div id="lab-target" class="rounded-md border border-emerald-300 bg-emerald-300/15 p-4">
-      <p class="text-sm font-semibold text-emerald-50">Outer patch replaced this node.</p>
-      <p class="mt-1 text-sm text-emerald-100/80">Patch count {@count}</p>
+    <div id="lab-target" class="border border-primary bg-primary/10 p-4">
+      <p class="text-sm font-semibold text-base-content">Outer patch replaced this node.</p>
+      <p class="mt-1 text-sm text-base-content/70">Patch count {@count}</p>
       <div id="patch-list" class="mt-4 grid gap-2">
-        <div
-          id={"outer-seed-#{@count}"}
-          class="rounded-md bg-zinc-900 px-3 py-2 text-sm text-zinc-300"
-        >
+        <div id={"outer-seed-#{@count}"} class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
           New list seed
         </div>
       </div>
