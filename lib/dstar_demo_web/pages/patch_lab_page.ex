@@ -141,7 +141,7 @@ defmodule DstarDemoWeb.PatchLabPage do
             <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
           </:liveview>
 
-          <:note>{@snippet.note}</:note>
+          <:note><.rich_text text={@snippet.note} /></:note>
         </.compare>
       </:comparison>
     </.demo_shell>

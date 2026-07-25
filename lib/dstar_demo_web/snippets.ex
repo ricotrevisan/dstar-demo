@@ -24,6 +24,25 @@ defmodule DstarDemoWeb.Snippets do
 
         conn
         |> patch(&status_badge/1, intent: intent)
+        |> patch(&field_feedback/1,
+          name: "email",
+          hint: "Company addresses only — try ada@example.com.",
+          field: validation["email"],
+          intent: intent
+        )
+        |> patch(&field_feedback/1,
+          name: "first_name",
+          field: validation["first_name"],
+          intent: intent
+        )
+        |> patch(&field_feedback/1,
+          name: "last_name",
+          field: validation["last_name"],
+          intent: intent
+        )
+        |> patch(&validation_panel/1, validation: validation, intent: intent)
+        |> patch(&payload_panel/1, submitted: submitted)
+      end
       """,
       liveview: """
       # Illustrative LiveView equivalent — not compiled or run.
@@ -144,11 +163,15 @@ defmodule DstarDemoWeb.Snippets do
       through `phx-change`'s loading classes, where the Dstar version declares
       `data-indicator="_searchPending"` explicitly.
 
-      Dstar's one real advantage is that `query` lives in a client signal, so the
-      server never re-renders the input at all. There is no round trip that could
-      disturb a cursor position or an in-progress IME composition — which is
-      exactly what the comment in the handler is guarding — and nothing is held
-      open between keystrokes.
+      Dstar's one real advantage is that `query` lives in a client signal, so
+      the server never renders the input at all. LiveView protects the focused
+      input too — it deliberately never overwrites the value of the element you
+      are typing in, which is documented behaviour rather than luck. The
+      difference is that LiveView needs that guard because the input is
+      server-rendered on every round trip, and here there is no round trip to
+      guard: the value is only ever read from the client, never sent back to it.
+      That is exactly what the comment in the handler is preserving, and it is
+      why nothing has to be held open between keystrokes.
       """
     },
     streaming_dashboard: %{
@@ -352,9 +375,10 @@ defmodule DstarDemoWeb.Snippets do
       """,
       note: """
       Near parity, and `Phoenix.LiveComponent` does strictly more:
-      it has its own lifecycle through `update/3` and `preload/1`, and it can
-      hold state between events without the parent knowing. If a stage needed to
-      remember anything of its own, LiveView would win here without argument.
+      it has its own lifecycle through `update/2` and `update_many/1`, and it
+      can hold state between events without the parent knowing. If a stage
+      needed to remember anything of its own, LiveView would win here without
+      argument.
 
       The costs on the LiveView side are that a component requires an `:id`, that
       every event needs `phx-target={@myself}` or it silently dispatches to the
@@ -451,6 +475,15 @@ defmodule DstarDemoWeb.Snippets do
          |> push_event("script-pulse", %{run: runs})}
       end
 
+      def handle_event("console", _params, socket) do
+        runs = socket.assigns.script_runs + 1
+
+        {:noreply,
+         socket
+         |> assign(script_runs: runs, last_script_action: "push_event")
+         |> push_event("script-log", %{level: "info", run: runs})}
+      end
+
       def handle_event("redirect", _params, socket) do
         {:noreply, push_navigate(socket, to: ~p"/scripts?redirected=1")}
       end
@@ -463,6 +496,10 @@ defmodule DstarDemoWeb.Snippets do
       #       this.handleEvent("script-pulse", ({run}) => {
       #         document.documentElement.dataset.dstarScriptPulse = String(run)
       #       })
+      #
+      #       this.handleEvent("script-log", ({level, run}) => {
+      #         console[level]("dstar demo", {run})
+      #       })
       #     }
       #   }
       """,
@@ -472,9 +509,11 @@ defmodule DstarDemoWeb.Snippets do
       bundle; `execute_script/3` sends **code**. Anything interpolated into that
       string is one mistake away from running in the browser — which is why this
       page's own counter goes through `Jason.encode!/1` before it is spliced in.
-      LiveView also gives `push_navigate/2` and `push_patch/2`, which move the
-      user without discarding the process, where `redirect/3` is a full
-      navigation.
+      LiveView also gives two softer ways to move the user than the full
+      navigation `redirect/3` performs: `push_patch/2` changes the URL and
+      re-runs `handle_params/3` in the same process, and `push_navigate/2`
+      tears this LiveView down and mounts another over the same socket — a new
+      process, but still no page load.
 
       Dstar's helpers win on immediacy only: no hook has to be written,
       registered, or bundled to make a one-off effect happen. That is why they
@@ -501,6 +540,13 @@ defmodule DstarDemoWeb.Snippets do
       liveview: """
       # Illustrative LiveView equivalent — not compiled or run.
       def mount(_params, _session, socket) do
+        socket =
+          assign(socket,
+            visitor_name: random_name(),
+            visitor_color: random_color(),
+            activity: []
+          )
+
         if connected?(socket) do
           Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
 
@@ -513,11 +559,15 @@ defmodule DstarDemoWeb.Snippets do
             })
         end
 
-        {:ok, assign(socket, roster: Presence.list(@topic), activity: [])}
+        {:ok, assign(socket, roster: Presence.list(@topic))}
       end
 
       def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
         {:noreply, assign(socket, roster: Presence.list(@topic))}
+      end
+
+      def handle_info({:ping, name}, socket) do
+        {:noreply, assign(socket, activity: [name | socket.assigns.activity])}
       end
 
       def handle_event("ping", _params, socket) do

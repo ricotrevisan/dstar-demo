@@ -10,9 +10,11 @@
    The heroicons installation itself is managed by your mix.exs */
 @plugin "../vendor/heroicons";
 
-/* DaisyUI supplies the theme tokens plus btn, badge, kbd and tabs. Everything
-   structural on these pages is hand-written Tailwind, so DaisyUI's rounded,
-   shadowed product-app look never gets a chance to override the design. */
+/* DaisyUI is here for its theme tokens, and in practice for nothing else.
+   Everything structural on these pages is hand-written Tailwind — no markup
+   uses btn, badge, kbd or tabs, so Tailwind 4 prunes those component classes
+   and DaisyUI's rounded, shadowed product-app look never gets a chance to
+   override the design. */
 @plugin "../vendor/daisyui" {
   themes: false;
 }

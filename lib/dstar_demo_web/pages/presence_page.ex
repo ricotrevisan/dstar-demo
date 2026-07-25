@@ -280,9 +280,9 @@ defmodule DstarDemoWeb.PresencePage do
 
       <:comparison>
         <.prose>
-          Both sides track each tab with `Phoenix.Presence`, react to
-          `presence_diff`, and broadcast a room ping. They differ in what has to
-          happen when a visitor leaves.
+          Both sides track each tab with <code class="font-mono text-sm">Phoenix.Presence</code>,
+          react to <code class="font-mono text-sm">presence_diff</code>, and broadcast a room ping.
+          They differ in what has to happen when a visitor leaves.
         </.prose>
 
         <.compare>
@@ -298,7 +298,7 @@ defmodule DstarDemoWeb.PresencePage do
             <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
           </:liveview>
 
-          <:note>{@snippet.note}</:note>
+          <:note><.rich_text text={@snippet.note} /></:note>
         </.compare>
       </:comparison>
     </.demo_shell>

@@ -392,6 +392,30 @@ defmodule DstarDemoWeb.PagesTest do
     end
   end
 
+  # The notes are stored as plain text and rendered by rich_text/1. Before that
+  # existed they were interpolated straight into HEEx, so readers saw literal
+  # backticks and asterisks — twelve of them on one page.
+  test "comparison notes render markup rather than showing its markers", %{conn: conn} do
+    for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
+      response = conn |> recycle() |> get(path) |> html_response(200)
+
+      comparison =
+        response
+        |> LazyHTML.from_document()
+        |> LazyHTML.query("#comparison")
+
+      text = LazyHTML.text(comparison)
+
+      refute text =~ "`", "#{path} shows a literal backtick in its comparison"
+      refute text =~ "**", "#{path} shows literal bold markers in its comparison"
+
+      # …because the markers became elements, not because they were dropped.
+      note = LazyHTML.query(comparison, "aside")
+      assert LazyHTML.query(note, "code") |> Enum.count() > 0, "#{path}: note has no <code>"
+      assert LazyHTML.query(note, "p") |> Enum.count() > 1, "#{path}: note is one paragraph"
+    end
+  end
+
   test "a comparison labels the LiveView side as illustrative", %{conn: conn} do
     response = conn |> recycle() |> get(~p"/search") |> html_response(200)
 

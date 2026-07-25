@@ -96,7 +96,7 @@ defmodule DstarDemoWeb.DemoComponents do
               <a
                 :for={{anchor, label} <- @jump_links}
                 href={"##{anchor}"}
-                class="text-base-content/60 transition hover:text-primary"
+                class="text-base-content/60 transition hover:text-base-content"
               >
                 {label}
               </a>
@@ -188,6 +188,51 @@ defmodule DstarDemoWeb.DemoComponents do
       {render_slot(@inner_block)}
     </p>
     """
+  end
+
+  attr :text, :string, required: true
+  attr :class, :string, default: nil
+
+  @doc """
+  Renders stored prose text as real markup: a blank line starts a new
+  paragraph, `backticks` become `<code>`, and `**stars**` become `<strong>`.
+
+  The eight LiveView comparison notes live in `DstarDemoWeb.Snippets` as plain
+  text so they can be read and reviewed side by side in one file. Interpolating
+  such a string straight into HEEx renders the markers literally and collapses
+  every paragraph break, so this is what turns them back into prose.
+
+  Author text is HTML-escaped *before* any tag is inserted, so the only markup
+  in the result is the literal wrapper tags below — nothing from the source
+  string can become an element.
+  """
+  def rich_text(assigns) do
+    assigns = assign(assigns, :paragraphs, paragraphs(assigns.text))
+
+    ~H"""
+    <p :for={paragraph <- @paragraphs} class={["mt-4 first:mt-0", @class]}>{paragraph}</p>
+    """
+  end
+
+  defp paragraphs(text) do
+    text
+    |> String.split(~r/\n[ \t]*\n/)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(&inline_markup/1)
+  end
+
+  defp inline_markup(paragraph) do
+    html =
+      paragraph
+      |> Phoenix.HTML.html_escape()
+      |> Phoenix.HTML.safe_to_string()
+      |> then(&Regex.replace(~r/`([^`\n]+)`/, &1, ~s(<code class="font-mono text-sm">\\1</code>)))
+      |> then(
+        &Regex.replace(~r/\*\*([^*\n]+)\*\*/, &1, ~s(<strong class="font-semibold">\\1</strong>))
+      )
+
+    {:safe, html}
   end
 
   attr :label, :string, required: true
@@ -302,7 +347,7 @@ defmodule DstarDemoWeb.DemoComponents do
         <div class="min-w-0">
           <h3 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
             <span class="inline-block size-2 shrink-0 bg-primary" aria-hidden="true"></span>
-            Dstar <span class="font-normal text-base-content/55">— this page's real code</span>
+            Dstar <span class="font-normal text-base-content/70">— this page's real code</span>
           </h3>
           {render_slot(@dstar)}
         </div>
@@ -311,7 +356,7 @@ defmodule DstarDemoWeb.DemoComponents do
           <h3 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
             <span class="inline-block size-2 shrink-0 bg-base-300" aria-hidden="true"></span>
             LiveView
-            <span class="font-normal text-base-content/55">
+            <span class="font-normal text-base-content/70">
               — illustrative, never compiled or run
             </span>
           </h3>
