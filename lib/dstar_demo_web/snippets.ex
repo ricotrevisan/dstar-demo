@@ -166,8 +166,59 @@ defmodule DstarDemoWeb.Snippets do
         |> patch(&stream_frame/1, [tick: 0, status: "live"], selector: "#stream-frame")
       end
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      @stream_steps 8
+      @stream_delay 280
+
+      def mount(_params, _session, socket) do
+        if connected?(socket), do: Process.send_after(self(), {:tick, 1}, @stream_delay)
+
+        {:ok,
+         assign(socket,
+           status: "live",
+           tick: 0,
+           throughput: 118,
+           latency: 42,
+           progress: 0,
+           activity: []
+         )}
+      end
+
+      def handle_info({:tick, tick}, socket) when tick <= @stream_steps do
+        Process.send_after(self(), {:tick, tick + 1}, @stream_delay)
+
+        {:noreply,
+         assign(socket,
+           tick: tick,
+           throughput: 118 + tick * 9 + rem(tick, 3) * 4,
+           latency: 42 - min(tick * 2, 18),
+           progress: trunc(tick / @stream_steps * 100),
+           activity: [tick | socket.assigns.activity]
+         )}
+      end
+
+      def handle_info({:tick, _done}, socket) do
+        {:noreply, assign(socket, status: "complete", progress: 100)}
+      end
+      """,
+      note: """
+      LiveView wins, and it wins structurally rather than on ergonomics. A
+      LiveView **is** a stateful process per connection, so the entire notion of
+      `stream_key/1` deduplication disappears: there is no second stream to
+      replace, because a reconnect makes a new process and the old one dies. The
+      three metric tiles and the activity list are assigns, so no `patch/3` call
+      names a selector and no `mode: :prepend` has to be chosen. Bounding the run
+      needs no `{:halt, conn}` — the final `handle_info/2` clause simply stops
+      scheduling.
+
+      Dstar's model is preferable only if you want the connection to be an HTTP
+      request that ends. This stream closes and leaves nothing resident on the
+      server; a LiveView holds a process, and its assigns, for as long as the tab
+      is open. For a bounded eight-tick dashboard that is a poor trade, and this
+      is the demo where the Dstar version is doing the most extra work for the
+      least gain.
+      """
     },
     patch_lab: %{
       source: "#{@pages}/patch_lab_page.ex",
