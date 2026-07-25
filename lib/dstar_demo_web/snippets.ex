@@ -25,8 +25,51 @@ defmodule DstarDemoWeb.Snippets do
         conn
         |> patch(&status_badge/1, intent: intent)
       """,
-      liveview: nil,
-      note: nil
+      liveview: """
+      # Illustrative LiveView equivalent — not compiled or run.
+      def mount(_params, _session, socket) do
+        changeset = AccessPass.changeset(%AccessPass{}, %{})
+
+        {:ok, assign(socket, form: to_form(changeset, as: :access_pass))}
+      end
+
+      def handle_event("validate", %{"access_pass" => params}, socket) do
+        form =
+          %AccessPass{}
+          |> AccessPass.changeset(params)
+          |> Map.put(:action, :validate)
+          |> to_form(as: :access_pass)
+
+        {:noreply, assign(socket, form: form)}
+      end
+
+      def render(assigns) do
+        ~H\"\"\"
+        <.form for={@form} id="access-pass-form" phx-change="validate" phx-submit="save">
+          <.input field={@form[:email]} type="email" label="Email" required />
+          <.input field={@form[:first_name]} type="text" label="First name" minlength="2" />
+          <.input field={@form[:last_name]} type="text" label="Last name" />
+
+          <.button phx-disable-with="Checking…">Request access</.button>
+        </.form>
+        \"\"\"
+      end
+      """,
+      note: """
+      LiveView wins this one outright. A changeset plus `to_form/2` gives you
+      field-level errors, `<.input>` renders each error next to its own field,
+      `used_input?/1` keeps untouched fields quiet until they are touched,
+      `phx-disable-with` handles the in-flight state, and form recovery after a
+      dropped connection is automatic. The Dstar version hand-rolls all of it:
+      the six `patch/3` calls and the whole `field_feedback/1` component exist to
+      do what `<.input>` does for free.
+
+      What Dstar buys in exchange is that this is a plain HTML form. It posts
+      with `contentType: 'form'`, so the server receives ordinary form params and
+      the markup would still submit with JavaScript disabled — and the response
+      names exactly which six fragments change, rather than diffing a rendered
+      tree the server had to keep.
+      """
     },
     active_search: %{
       source: "#{@pages}/active_search_page.ex",

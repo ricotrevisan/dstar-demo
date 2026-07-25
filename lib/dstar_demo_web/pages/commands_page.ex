@@ -124,6 +124,29 @@ defmodule DstarDemoWeb.CommandsPage do
           />
         </div>
       </:how_it_works>
+
+      <:comparison>
+        <.prose>
+          Both sides validate the same three fields with the same rules, and both
+          keep what you typed while showing server-owned feedback.
+        </.prose>
+
+        <.compare>
+          <:dstar>
+            <.code_block
+              language={@snippet.wiring_language}
+              label={@snippet.source}
+              code={@snippet.wiring}
+            />
+          </:dstar>
+
+          <:liveview>
+            <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
+          </:liveview>
+
+          <:note>{@snippet.note}</:note>
+        </.compare>
+      </:comparison>
     </.demo_shell>
     """
   end
