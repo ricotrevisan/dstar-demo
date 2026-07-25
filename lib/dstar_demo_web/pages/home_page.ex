@@ -6,98 +6,83 @@ defmodule DstarDemoWeb.HomePage do
     ~H"""
     <Layouts.flash_group flash={@flash} />
 
-    <main class="min-h-screen bg-zinc-950 text-zinc-100">
-      <section class="mx-auto flex min-h-screen w-full max-w-7xl flex-col px-4 py-5 sm:px-6 lg:px-8">
-        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-4">
-          <a href={~p"/"} class="flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <span class="grid size-8 place-items-center rounded-md bg-emerald-300 text-zinc-950">
-              <.icon name="hero-bolt" class="size-4" />
+    <div class="min-h-screen bg-base-100 text-base-content">
+      <div class="mx-auto w-full max-w-[1100px] px-5 py-10 sm:px-8">
+        <header class="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-5">
+          <a href={~p"/"} class="flex items-center gap-2.5 text-sm font-semibold tracking-tight">
+            <span class="grid size-7 place-items-center bg-primary text-primary-content">
+              <.icon name="hero-bolt-micro" class="size-4" />
             </span>
             Dstar Demo
           </a>
           <Layouts.theme_toggle />
         </header>
 
-        <div class="grid gap-5 py-5 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <aside class="lg:sticky lg:top-5 lg:self-start">
-            <p class="text-xs font-semibold tracking-[0.16em] text-emerald-300 uppercase">
-              Demo map
-            </p>
-            <h1 class="mt-3 text-3xl font-semibold leading-tight text-zinc-50 sm:text-4xl">
-              Dstar server UI showcase
-            </h1>
-            <p class="mt-3 text-sm leading-6 text-zinc-400">
-              Eight focused Dstar.Page modules for commands, signals, element patches, streaming,
-              components, and presence — each page is one module and one router line.
-            </p>
-          </aside>
+        <h1 class="mt-10 max-w-[68ch] text-4xl font-semibold tracking-tight sm:text-5xl">
+          Dstar server UI showcase
+        </h1>
+        <p class="mt-4 max-w-[68ch] text-base leading-7 text-base-content/70">
+          Eight focused Dstar.Page modules for commands, signals, element patches, streaming,
+          components, and presence — each page is one module and one router line, shown beside
+          how Phoenix LiveView would solve the same problem.
+        </p>
 
-          <section id="map" class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            <.demo_tile
-              title="Form Validation"
-              status="ready"
-              href={~p"/commands"}
-              icon="hero-clipboard-document-check"
-              body="A native form submits fields with contentType: 'form' and patches feedback only."
-            />
-            <.demo_tile
-              title="Active Search"
-              status="ready"
-              href={~p"/search"}
-              icon="hero-magnifying-glass"
-              body="Typing sends signals and patches only the result panel."
-            />
-            <.demo_tile
-              title="Streaming Dashboard"
-              status="ready"
-              href={~p"/streaming"}
-              icon="hero-signal"
-              body="handle_connect and handle_info drive a bounded, deduplicated SSE stream."
-            />
-            <.demo_tile
-              title="Patch Lab"
-              status="ready"
-              href={~p"/patch-lab"}
-              icon="hero-squares-plus"
-              body="outer, inner, append, prepend, before, after, and remove."
-            />
-            <.demo_tile
-              title="Server Components"
-              status="ready"
-              href={~p"/components"}
-              icon="hero-cube-transparent"
-              body="A Dstar.Component colocates shared UI with its event handlers."
-            />
-            <.demo_tile
-              title="Signals Inspector"
-              status="ready"
-              href={~p"/signals"}
-              icon="hero-adjustments-horizontal"
-              body="patch_signals, remove_signals, and the signals handed to handle_event."
-            />
-            <.demo_tile
-              title="Script Helpers"
-              status="ready"
-              href={~p"/scripts"}
-              icon="hero-code-bracket-square"
-              body="execute_script, console_log, and a safe redirect target."
-            />
-            <.demo_tile
-              title="Presence Room"
-              status="ready"
-              href={~p"/presence"}
-              icon="hero-user-group"
-              body="Multiple tabs join one room, update the roster, and send pings."
-            />
-          </section>
-        </div>
-      </section>
-    </main>
+        <section id="map" class="mt-10 grid border-t border-l border-base-300 sm:grid-cols-2">
+          <.demo_tile
+            title="Form Validation"
+            href={~p"/commands"}
+            icon="hero-clipboard-document-check"
+            body="A native form submits fields with contentType: 'form' and patches feedback only."
+          />
+          <.demo_tile
+            title="Active Search"
+            href={~p"/search"}
+            icon="hero-magnifying-glass"
+            body="Typing sends signals and patches only the result panel."
+          />
+          <.demo_tile
+            title="Streaming Dashboard"
+            href={~p"/streaming"}
+            icon="hero-signal"
+            body="handle_connect and handle_info drive a bounded, deduplicated SSE stream."
+          />
+          <.demo_tile
+            title="Patch Lab"
+            href={~p"/patch-lab"}
+            icon="hero-squares-plus"
+            body="outer, inner, append, prepend, before, after, and remove."
+          />
+          <.demo_tile
+            title="Server Components"
+            href={~p"/components"}
+            icon="hero-cube-transparent"
+            body="A Dstar.Component colocates shared UI with its event handlers."
+          />
+          <.demo_tile
+            title="Signals Inspector"
+            href={~p"/signals"}
+            icon="hero-adjustments-horizontal"
+            body="patch_signals, remove_signals, and the signals handed to handle_event."
+          />
+          <.demo_tile
+            title="Script Helpers"
+            href={~p"/scripts"}
+            icon="hero-code-bracket-square"
+            body="execute_script, console_log, and a safe redirect target."
+          />
+          <.demo_tile
+            title="Presence Room"
+            href={~p"/presence"}
+            icon="hero-user-group"
+            body="Multiple tabs join one room, update the roster, and send pings."
+          />
+        </section>
+      </div>
+    </div>
     """
   end
 
   attr :title, :string, required: true
-  attr :status, :string, required: true
   attr :href, :string, required: true
   attr :icon, :string, required: true
   attr :body, :string, required: true
@@ -106,22 +91,16 @@ defmodule DstarDemoWeb.HomePage do
     ~H"""
     <a
       href={@href}
-      class="block rounded-lg border border-zinc-800 bg-zinc-900 p-4 transition hover:border-zinc-600 hover:bg-zinc-900/80 focus:outline-none focus:ring-2 focus:ring-emerald-300/60"
+      class="group border-r border-b border-base-300 p-5 transition hover:bg-base-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-inset"
     >
-      <div class="mb-5 flex items-center justify-between gap-3">
-        <span class="grid size-9 place-items-center rounded-md bg-zinc-950 text-emerald-300">
-          <.icon name={@icon} class="size-5" />
-        </span>
-        <span class={[
-          "rounded-full px-2 py-0.5 text-xs font-medium",
-          @status == "ready" && "bg-emerald-300 text-zinc-950",
-          @status != "ready" && "bg-zinc-800 text-zinc-300"
-        ]}>
-          {@status}
-        </span>
+      <div class="flex items-center gap-2.5">
+        <.icon
+          name={@icon}
+          class="size-5 shrink-0 text-base-content/45 transition group-hover:text-primary"
+        />
+        <h2 class="text-base font-semibold tracking-tight">{@title}</h2>
       </div>
-      <h2 class="text-base font-semibold text-zinc-100">{@title}</h2>
-      <p class="mt-2 text-sm leading-6 text-zinc-400">{@body}</p>
+      <p class="mt-2 max-w-[52ch] text-sm leading-6 text-base-content/65">{@body}</p>
     </a>
     """
   end

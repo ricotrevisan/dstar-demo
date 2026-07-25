@@ -20,6 +20,15 @@ defmodule DstarDemoWeb.PagesTest do
     assert response =~ ~s[href="/components"]
     assert response =~ ~s[href="/signals"]
     assert response =~ ~s[href="/scripts"]
+
+    # Every demo is reachable from the home page, including presence, which the
+    # original test omitted.
+    assert response =~ ~s[href="/presence"]
+
+    # Restyled onto theme tokens — no leftover hardcoded dark utilities.
+    refute response =~ "bg-zinc-950"
+    refute response =~ "text-zinc-100"
+    refute response =~ "bg-emerald-300"
   end
 
   test "GET /commands", %{conn: conn} do
