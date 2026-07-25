@@ -33,7 +33,12 @@ These were checked against the code and the published packages while writing thi
 5. **The suite has 43 tests, not 38.** The spec's Testing section says "of the 38 existing tests"; the actual count at `15dffbb` is 43. Use 43 as the baseline when checking that nothing regressed.
 6. **`pages_test.exs` needs no repair.** The spec's Testing and Risks sections expect churn in the page-render assertions. There is none to do: every marker in `demo_pages/0` (`pages_test.exs:346-356`) and both bare copy assertions (lines 10 and 29) match page **titles**, which this restyle keeps verbatim. No test anywhere asserts an `eyebrow` string or a `demo_facts` bullet. The at-risk set is empty, so that risk is closed rather than mitigated. This plan *adds* assertions; it repairs none.
 7. **Patch Lab has five facts, not four.** The spec says every demo has four `demo_facts` bullets. Seven do; `patch_lab_page.ex:24-30` has five. Move whatever each page has.
-8. **`demo_pages/0` covers seven pages, not eight.** Presence is exercised by `test/dstar_demo_web/presence_page_test.exs` instead. Leave that split alone.
+8. **`assign/3` does not work inside a Dstar `render/1`.** Use `Map.put/3` — it is this codebase's own pre-existing pattern (see `patch_lab_page.ex` at baseline). This binds Tasks 4-11, which all assign a snippet in `render/1`.
+9. **`code_block`'s `label` must be `{@snippet.source}`,** never a hardcoded path. It is the one field in the snippet contract the drift test cannot guard, so a moved file would leave eight pages citing a dead path with a green suite.
+10. **Focus rings must be `focus-visible:ring-primary` at full opacity.** `/40` measures 1.66:1 on white and fails the 3:1 non-text floor; the dark original it replaced was 5.07:1, so a tinted ring is a regression, not a restyle.
+11. **DaisyUI's semantic tokens are calibrated for a dark surface and are overridden in light** — its `error` is `#ff627d`, 2.87:1 on white. The light theme sets `error #b91c1c`, `success #15803d`, `warning #a16207`, `neutral #a21caf` (all with `#ffffff` content), and `neutral` doubles as the eighth presence hue in both modes. `--color-info` is deliberately left at DaisyUI's default, so **`text-info` is 2.22:1 on white — do not use it as small text.**
+12. **A `*-content` token pairs with its SOLID fill, never with a tint.** `bg-error/15` + `text-error-content` measures 1.25-2.12:1 in dark. On a tint, use `text-base-content`.
+13. **`demo_pages/0` covers seven pages, not eight.** Presence is exercised by `test/dstar_demo_web/presence_page_test.exs` instead. Leave that split alone.
 
 ## File Structure
 
@@ -144,25 +149,17 @@ Replace the entire file with:
 /* Named "light" and "dark" on purpose: assets/js/app.js sets
    data-theme="light"|"dark", and the theme plugin keys its selector off that
    attribute. These names also inherit DaisyUI's built-in token sets, so only
-   the five tokens the design specifies need overriding. */
-@plugin "../vendor/daisyui-theme" {
-  name: "light";
-  default: true;
-  color-scheme: "light";
-  --color-base-100: #ffffff;
-  --color-base-200: #fafafa;
-  --color-base-300: #e2e2e2;
-  --color-base-content: #111111;
-  --color-primary: #e8590c;
-  --color-primary-content: #ffffff;
-  --radius-selector: 0.25rem;
-  --radius-field: 0.25rem;
-  --radius-box: 0.25rem;
-  --border: 1px;
-  --depth: 0;
-  --noise: 0;
-}
+   the tokens the design specifies need overriding.
 
+   Order matters here and is NOT cosmetic: the vendored plugin emits
+   `prefersdark`'s `@media (prefers-color-scheme: dark)` block *before* that
+   theme's own `[data-theme=...]` selector. Both a theme selector and the
+   media-wrapped `:root` rule have equal specificity, so whichever comes
+   later in the stylesheet wins ties. The dark block must be declared FIRST
+   so that light's `[data-theme="light"]` selector is emitted last and beats
+   the OS-dark media query — otherwise an explicit "light" toggle on an
+   OS-dark machine is silently overridden back to dark. Do not reorder these
+   back to alphabetical/light-first without re-verifying this cascade. */
 @plugin "../vendor/daisyui-theme" {
   name: "dark";
   prefersdark: true;
@@ -173,6 +170,44 @@ Replace the entire file with:
   --color-base-content: #f2f2f2;
   --color-primary: #e8590c;
   --color-primary-content: #0c0c0c;
+  /* neutral is repurposed as the eighth presence hue; DaisyUI ships it as
+     oklch(14% ...) in BOTH modes, which is black-on-black in dark. */
+  --color-neutral: #e879f9;
+  --color-neutral-content: #0c0c0c;
+  --radius-selector: 0.25rem;
+  --radius-field: 0.25rem;
+  --radius-box: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}
+
+@plugin "../vendor/daisyui-theme" {
+  name: "light";
+  default: true;
+  color-scheme: "light";
+  --color-base-100: #ffffff;
+  --color-base-200: #fafafa;
+  --color-base-300: #e2e2e2;
+  --color-base-content: #111111;
+  --color-primary: #e8590c;
+  --color-primary-content: #0c0c0c;
+  /* DaisyUI's semantic defaults are calibrated for a dark surface and fail as
+     text on white — its error is #ff627d, 2.87:1. These darker variants let hue
+     carry meaning in small text instead of being decoration only. Measured on
+     #ffffff / on #fafafa: error 6.47/6.20 · success 5.02/4.81 ·
+     warning 4.92/4.72 · neutral 6.32/6.06. All are dark fills, so -content
+     flips to white (4.92-6.47:1). */
+  --color-error: #b91c1c;
+  --color-error-content: #ffffff;
+  --color-success: #15803d;
+  --color-success-content: #ffffff;
+  --color-warning: #a16207;
+  --color-warning-content: #ffffff;
+  /* neutral is repurposed as the eighth presence hue; DaisyUI ships it as
+     oklch(14% ...) in BOTH modes, which is black-on-black in dark. */
+  --color-neutral: #a21caf;
+  --color-neutral-content: #ffffff;
   --radius-selector: 0.25rem;
   --radius-field: 0.25rem;
   --radius-box: 0.25rem;
@@ -199,6 +234,35 @@ Replace the entire file with:
 html {
   scrollbar-gutter: stable;
   background: var(--color-base-100);
+}
+
+/* Makeup token colours, written against theme tokens so they follow
+   light/dark. Deliberately monochrome: the accent fails the 4.5:1 floor for
+   small text, and code is small text, so weight, opacity and italics carry the
+   distinction instead of hue. Every step below clears 4.5:1 in both themes at
+   the component's own text-[13px]; 58% is the measured floor, so nothing here
+   may go below 60%. Only the classes our two lexers emit are styled. */
+.hl code {
+  color: var(--color-base-content);
+}
+.hl .c, .hl .c1, .hl .cm {          /* comments — italic is the real marker */
+  color: color-mix(in oklab, var(--color-base-content) 60%, transparent);
+  font-style: italic;
+}
+.hl .k, .hl .kd, .hl .kn {          /* keywords: do, end, def, defmodule */
+  font-weight: 600;
+}
+.hl .nc, .hl .nf, .hl .nt {         /* module, function and tag names */
+  font-weight: 600;
+}
+.hl .o, .hl .p {                    /* operators and punctuation */
+  color: color-mix(in oklab, var(--color-base-content) 70%, transparent);
+}
+.hl .na {                            /* attribute names */
+  color: color-mix(in oklab, var(--color-base-content) 80%, transparent);
+}
+.hl .s, .hl .s1, .hl .s2, .hl .ss { /* strings and atoms */
+  color: color-mix(in oklab, var(--color-base-content) 88%, transparent);
 }
 ```
 
@@ -886,7 +950,7 @@ Then restyle the three remaining components onto theme tokens. Replace `pill/1`,
       data-on:click={@click}
       class={[
         "inline-flex items-center gap-2 border px-3 py-2 text-sm font-medium transition",
-        "focus:outline-none focus:ring-2 focus:ring-primary/40",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
         @active && "border-primary bg-primary text-primary-content",
         !@active && "border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-200"
       ]}
@@ -1097,12 +1161,12 @@ The demo markup moving into `<:demo>` is currently styled for a dark app. Apply 
 | `text-zinc-200`, `text-zinc-300` | `text-base-content/80` |
 | `text-zinc-400` | `text-base-content/70` |
 | `text-zinc-500` | `text-base-content/55` |
-| `text-zinc-600` | `text-base-content/45` |
+| `text-zinc-600` | `text-base-content/65` on text (placeholders carry content; `/45` is 3.04:1). `/45` only on non-text such as icons. |
 | `bg-emerald-300 text-zinc-950`, `hover:bg-emerald-200` | `bg-primary text-primary-content`, `hover:bg-primary/90` |
 | `text-emerald-300`, `text-emerald-100`, `text-emerald-200/80` | `text-primary` (large/UI only — never body copy) |
 | `border-emerald-300/30`, `border-emerald-300` | `border-primary/40` |
 | `bg-emerald-300/10`, `bg-emerald-300/15` | `bg-primary/10` |
-| `focus:ring-emerald-300/60` | `focus:ring-primary/40` |
+| `focus:ring-emerald-300/60` | `focus-visible:ring-primary` at **full opacity** |
 | `focus:border-emerald-300`, `focus:ring-emerald-300/20` | `focus:border-primary`, `focus:ring-primary/20` |
 | `bg-sky-300/15 text-sky-200`, `border-sky-300/30 bg-sky-300/10 text-sky-100` | `bg-info/15 text-info-content`, `border-info/30 bg-info/10 text-info-content` |
 | `bg-amber-300/15 text-amber-200`, `border-amber-300/30 bg-amber-300/10 text-amber-100` | `bg-warning/15 text-warning-content`, `border-warning/30 bg-warning/10 text-warning-content` |
@@ -1118,7 +1182,7 @@ Replace the `~H` body's opening through the end of `</:aside>` and re-close the 
 ```elixir
   @impl Dstar.Page
   def render(assigns) do
-    assigns = assign(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:active_search))
+    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:active_search))
 
     ~H"""
     <.demo_shell
@@ -1153,7 +1217,7 @@ Replace the `~H` body's opening through the end of `</:aside>` and re-close the 
         <div class="mt-6">
           <.code_block
             language={@snippet.wiring_language}
-            label="lib/dstar_demo_web/pages/active_search_page.ex"
+            label={@snippet.source}
             code={@snippet.wiring}
           />
         </div>
@@ -1439,7 +1503,7 @@ In `lib/dstar_demo_web/pages/active_search_page.ex`, after the `</:how_it_works>
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/active_search_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -1543,7 +1607,7 @@ In `lib/dstar_demo_web/pages/commands_page.ex`, after `</:how_it_works>`:
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/commands_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -1652,7 +1716,7 @@ In `lib/dstar_demo_web/pages/streaming_dashboard_page.ex`, after `</:how_it_work
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/streaming_dashboard_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -1770,7 +1834,7 @@ In `lib/dstar_demo_web/pages/patch_lab_page.ex`, after `</:how_it_works>`:
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/patch_lab_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -1875,7 +1939,7 @@ In `lib/dstar_demo_web/pages/server_components_page.ex`, after `</:how_it_works>
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/server_components_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -1976,7 +2040,7 @@ In `lib/dstar_demo_web/pages/signals_page.ex`, after `</:how_it_works>`:
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/signals_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -2073,7 +2137,7 @@ In `lib/dstar_demo_web/pages/scripts_page.ex`, after `</:how_it_works>`:
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/scripts_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -2187,7 +2251,7 @@ In `lib/dstar_demo_web/pages/presence_page.ex`, after `</:how_it_works>`:
           <:dstar>
             <.code_block
               language={@snippet.wiring_language}
-              label="lib/dstar_demo_web/pages/presence_page.ex"
+              label={@snippet.source}
               code={@snippet.wiring}
             />
           </:dstar>
@@ -2364,7 +2428,7 @@ Replace `render/1` and `demo_tile/1` in `lib/dstar_demo_web/pages/home_page.ex` 
     ~H"""
     <a
       href={@href}
-      class="group border-r border-b border-base-300 p-5 transition hover:bg-base-200 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-inset"
+      class="group border-r border-b border-base-300 p-5 transition hover:bg-base-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus:ring-inset"
     >
       <div class="flex items-center gap-2.5">
         <.icon name={@icon} class="size-5 shrink-0 text-base-content/45 transition group-hover:text-primary" />
