@@ -61,7 +61,7 @@ defmodule DstarDemo.MixProject do
       {:jason, "~> 1.2"},
       {:dns_cluster, "~> 0.2.0"},
       {:bandit, "~> 1.5"},
-      {:dstar, "~> 0.1.4"},
+      {:dstar, "~> 0.1.5"},
       {:ecto_sql, "~> 3.13"},
       {:postgrex, "~> 0.20"},
       {:tidewave, "~> 0.6", only: [:dev]}

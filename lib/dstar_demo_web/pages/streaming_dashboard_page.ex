@@ -25,7 +25,6 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
     Process.send_after(self(), {:tick, 1}, @stream_delay)
 
     conn
-    |> assign(:tab_id, read_signals(conn)["tabId"])
     |> patch_signals(%{streamStatus: "live", progress: 0, tick: 0})
     |> patch(&stream_frame/1, [tick: 0, status: "live"], selector: "#stream-frame")
   end
@@ -72,7 +71,7 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
         |> patch(&activity_row/1, [tick: tick], selector: "#activity-log", mode: :prepend)
 
       {:error, conn} ->
-        {:halt, unregister_stream(conn)}
+        {:halt, conn}
     end
   end
 
@@ -84,18 +83,7 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
         selector: "#stream-frame"
       )
 
-    {:halt, unregister_stream(conn)}
-  end
-
-  # The connection process outlives the completed stream under keep-alive;
-  # a stale registry entry would let the next connect for this tab kill it
-  # while it serves an unrelated request.
-  defp unregister_stream(conn) do
-    if tab_id = conn.assigns[:tab_id] do
-      Registry.unregister(Dstar.Utility.StreamRegistry, {stream_key(conn), tab_id})
-    end
-
-    conn
+    {:halt, conn}
   end
 
   @impl Dstar.Page
