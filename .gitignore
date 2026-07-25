@@ -41,3 +41,6 @@ npm-debug.log
 # Local Pi MCP configuration.
 /.pi/
 
+# Brainstorming companion mockups.
+/.superpowers/
+
