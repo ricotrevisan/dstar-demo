@@ -64,7 +64,13 @@ defmodule DstarDemo.MixProject do
       {:dstar, "~> 0.1.5"},
       {:ecto_sql, "~> 3.13"},
       {:postgrex, "~> 0.20"},
-      {:tidewave, "~> 0.6", only: [:dev]}
+      {:tidewave, "~> 0.6", only: [:dev]},
+      {:makeup, "~> 1.2"},
+      {:makeup_elixir, "~> 1.0"},
+      {:makeup_eex, "~> 2.0"},
+      # makeup_eex's HEEx lexer refuses to run without an HTML lexer
+      # registered. Its error message suggests "~> 1.0", which does not exist.
+      {:makeup_html, "~> 0.2"}
     ]
   end
 

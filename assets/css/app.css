@@ -86,3 +86,30 @@ html {
   scrollbar-gutter: stable;
   background: var(--color-base-100);
 }
+
+/* Makeup token colours, written against theme tokens so they follow
+   light/dark. Deliberately monochrome: the accent fails the 4.5:1 floor for
+   small text, and code is small text, so weight, opacity and italics carry the
+   distinction instead of hue. Only the classes our two lexers emit are styled. */
+.hl code {
+  color: var(--color-base-content);
+}
+.hl .c, .hl .c1, .hl .cm {          /* comments */
+  color: color-mix(in oklab, var(--color-base-content) 45%, transparent);
+  font-style: italic;
+}
+.hl .k, .hl .kd, .hl .kn {          /* keywords: do, end, def, defmodule */
+  font-weight: 600;
+}
+.hl .nc, .hl .nf, .hl .nt {         /* module, function and tag names */
+  font-weight: 600;
+}
+.hl .na {                            /* attribute names */
+  color: color-mix(in oklab, var(--color-base-content) 65%, transparent);
+}
+.hl .s, .hl .s1, .hl .s2, .hl .ss { /* strings and atoms */
+  color: color-mix(in oklab, var(--color-base-content) 78%, transparent);
+}
+.hl .o, .hl .p {                    /* operators and punctuation */
+  color: color-mix(in oklab, var(--color-base-content) 50%, transparent);
+}

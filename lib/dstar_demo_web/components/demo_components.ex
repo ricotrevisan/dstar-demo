@@ -4,6 +4,7 @@ defmodule DstarDemoWeb.DemoComponents do
   use Phoenix.Component
 
   import DstarDemoWeb.CoreComponents
+  import DstarDemoWeb.CodeHighlight, only: [highlight: 2]
 
   use Phoenix.VerifiedRoutes,
     endpoint: DstarDemoWeb.Endpoint,
@@ -177,6 +178,24 @@ defmodule DstarDemoWeb.DemoComponents do
       <.icon name={@icon} class="size-4" />
       <span>{@label}</span>
     </button>
+    """
+  end
+
+  attr :code, :string, required: true
+  attr :language, :string, default: "elixir", values: ~w(elixir heex)
+  attr :label, :string, default: nil, doc: "usually the source path the snippet came from"
+
+  def code_block(assigns) do
+    ~H"""
+    <figure class="hl min-w-0">
+      <figcaption
+        :if={@label}
+        class="border border-base-300 border-b-0 bg-base-200 px-4 py-2 font-mono text-xs text-base-content/55"
+      >
+        {@label}
+      </figcaption>
+      <pre class="overflow-x-auto border border-base-300 bg-base-200 p-4 font-mono text-[13px] leading-6"><code>{highlight(@code, @language)}</code></pre>
+    </figure>
     """
   end
 end
