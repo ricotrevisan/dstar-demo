@@ -6,7 +6,23 @@ defmodule DstarDemoWeb.PresencePage do
   @topic "presence:lobby"
   @stream_scope {:dstar_demo, :presence}
   @colors ~w(emerald sky violet amber rose cyan lime fuchsia)
-  @animals ~w(Otter Finch Lynx Panda Moth Heron Gecko Raven)
+
+  # Visitors are named after the main cast of The Expanse. The portraits are
+  # scaled-down stills from expanse.fandom.com, copied into priv/static so the
+  # page never reaches out to another host at runtime. A visitor who renames
+  # themselves to something off this list falls back to initials-in-a-circle.
+  @characters [
+    %{name: "James Holden", avatar: "holden", color: "sky"},
+    %{name: "Naomi Nagata", avatar: "nagata", color: "violet"},
+    %{name: "Amos Burton", avatar: "burton", color: "amber"},
+    %{name: "Alex Kamal", avatar: "kamal", color: "rose"},
+    %{name: "Chrisjen Avasarala", avatar: "avasarala", color: "fuchsia"},
+    %{name: "Bobbie Draper", avatar: "draper", color: "lime"},
+    %{name: "Camina Drummer", avatar: "drummer", color: "cyan"},
+    %{name: "Josephus Miller", avatar: "miller", color: "emerald"}
+  ]
+
+  @avatars Map.new(@characters, &{&1.name, &1.avatar <> ".webp"})
 
   @impl Dstar.Page
   def mount(conn, _params) do
@@ -88,17 +104,57 @@ defmodule DstarDemoWeb.PresencePage do
     end
   end
 
+  def handle_info({:presence_rename, name}, conn) do
+    case current_meta(conn.assigns.tab_id) do
+      %{name: ^name} ->
+        conn
+
+      %{} = meta ->
+        {:ok, _} = Presence.update(self(), @topic, conn.assigns.tab_id, %{meta | name: name})
+        broadcast_activity("#{meta.name} is now #{name}", "rename", meta.color)
+
+        # Presence.update's diff repaints every roster, including this tab's.
+        # The "You" card is outside #presence-board, so patch its avatar here;
+        # the name itself is already on screen — the input the user typed into.
+        case safe_presence_patch(conn, fn conn ->
+               patch(
+                 conn,
+                 &avatar/1,
+                 [
+                   id: "presence-you-avatar",
+                   name: name,
+                   color: meta.color,
+                   class: "size-11 text-sm"
+                 ],
+                 selector: "#presence-you-avatar"
+               )
+             end) do
+          {:ok, conn} -> conn
+          {:closed, conn} -> {:halt, conn}
+        end
+
+      nil ->
+        conn
+    end
+  end
+
   def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff", payload: diff}, conn) do
     {joins, leaves} = presence_diff_summary(diff)
     message = "Presence changed: +#{joins} / -#{leaves}"
 
     case safe_presence_patch(conn, fn conn ->
-           conn
-           |> patch_presence()
-           |> patch(&activity_row/1, [message: message, kind: "diff", color: "sky"],
-             selector: "#presence-activity",
-             mode: :prepend
-           )
+           conn = patch_presence(conn)
+
+           # A rename is a join and a leave on the same key. The roster still
+           # has to repaint, but announcing "+1 / -1" for it would be a lie.
+           if joins + leaves > 0 do
+             patch(conn, &activity_row/1, [message: message, kind: "diff", color: "sky"],
+               selector: "#presence-activity",
+               mode: :prepend
+             )
+           else
+             conn
+           end
          end) do
       {:ok, conn} -> conn
       {:closed, conn} -> {:halt, conn}
@@ -146,6 +202,21 @@ defmodule DstarDemoWeb.PresencePage do
     )
   end
 
+  # The name input is client-owned ($visitorName), so the roster only learns
+  # about a rename when this event hands it to the tab's own stream process —
+  # that process is the one Presence tracked under, so it owns the update.
+  def handle_event(conn, "rename", signals) do
+    registry_tab = Dstar.Utility.StreamRegistry.tab_id(conn)
+    presence_instance = sanitize_token(signals["presenceInstance"])
+    name = sanitize_name(signals["visitorName"])
+
+    if registry_tab && presence_instance && name do
+      notify_presence_stream(registry_tab, presence_instance, {:presence_rename, name})
+    end
+
+    conn
+  end
+
   # Sent by the pagehide beacon in app.js. The response body is never read
   # by the browser, so the already-started SSE stream simply closes empty.
   def handle_event(conn, "leave", signals) do
@@ -154,7 +225,11 @@ defmodule DstarDemoWeb.PresencePage do
     presence_instance = sanitize_token(signals["presenceInstance"])
 
     if registry_tab && presence_instance do
-      notify_presence_stream(registry_tab, presence_instance)
+      notify_presence_stream(
+        registry_tab,
+        presence_instance,
+        {:presence_leave, registry_tab, presence_instance}
+      )
     end
 
     conn
@@ -221,15 +296,24 @@ defmodule DstarDemoWeb.PresencePage do
             <div class="border border-base-300 bg-base-100 p-5">
               <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">You</p>
               <div class="mt-4 flex items-center gap-3">
-                <span class={[
-                  "grid size-11 place-items-center rounded-full text-sm font-bold",
-                  color_class(@visitorColor)
-                ]}>
-                  {initials(@visitorName)}
-                </span>
-                <div>
-                  <p class="font-semibold text-base-content">{@visitorName}</p>
-                  <p class="text-sm text-base-content/70">
+                <.avatar
+                  id="presence-you-avatar"
+                  name={@visitorName}
+                  color={@visitorColor}
+                  class="size-11 text-sm"
+                />
+                <div class="min-w-0">
+                  <label for="presence-you-name" class="sr-only">Your display name</label>
+                  <input
+                    id="presence-you-name"
+                    type="text"
+                    value={@visitorName}
+                    maxlength="40"
+                    data-bind:visitor-name
+                    data-on:input__debounce.400ms={event("rename")}
+                    class="w-full border-b border-base-300 bg-transparent px-0 py-0.5 font-semibold text-base-content focus:border-primary focus:outline-none"
+                  />
+                  <p class="mt-1 text-sm text-base-content/70">
                     status: <span data-text="$presenceStatus">{@presenceStatus}</span>
                   </p>
                 </div>
@@ -256,6 +340,7 @@ defmodule DstarDemoWeb.PresencePage do
           "Phoenix Presence tracks each browser tab as a visitor.",
           "handle_connect/2 and handle_info/2 drive the room stream.",
           "Roster, online count, and activity are patched independently.",
+          "Renaming yourself repaints every open tab's roster.",
           "The ping button broadcasts a tiny collaborative interaction."
         ]} />
 
@@ -325,12 +410,7 @@ defmodule DstarDemoWeb.PresencePage do
           class="flex items-center justify-between gap-3 border border-base-300 bg-base-100 p-3"
         >
           <div class="flex min-w-0 items-center gap-3">
-            <span class={[
-              "grid size-10 place-items-center rounded-full text-xs font-bold",
-              color_class(user.color)
-            ]}>
-              {initials(user.name)}
-            </span>
+            <.avatar name={user.name} color={user.color} class="size-10 text-xs" />
             <div class="min-w-0">
               <p class="truncate text-sm font-semibold text-base-content">{user.name}</p>
               <p class="text-xs text-base-content/65">active now</p>
@@ -340,6 +420,31 @@ defmodule DstarDemoWeb.PresencePage do
         </div>
       </div>
     </div>
+    """
+  end
+
+  attr :id, :string, default: nil
+  attr :name, :string, required: true
+  attr :color, :string, required: true
+  attr :class, :string, required: true
+
+  def avatar(assigns) do
+    assigns = assign(assigns, :src, avatar_src(assigns.name))
+
+    ~H"""
+    <span
+      id={@id}
+      class={[
+        "grid shrink-0 place-items-center overflow-hidden rounded-full font-bold",
+        @class,
+        is_nil(@src) && color_class(@color)
+      ]}
+    >
+      <%!-- The stills are taller than wide with the face near the top, so a
+      centred crop would take the forehead off. --%>
+      <img :if={@src} src={@src} alt={@name} class="size-full object-cover object-top" />
+      <span :if={is_nil(@src)}>{initials(@name)}</span>
+    </span>
     """
   end
 
@@ -355,8 +460,18 @@ defmodule DstarDemoWeb.PresencePage do
     """
   end
 
+  # Keys on both sides are updates to an existing entry (a rename), not
+  # arrivals or departures, so they cancel out of the join/leave counts.
   def presence_diff_summary(%{joins: joins, leaves: leaves}) do
-    {count_metas(joins), count_metas(leaves)}
+    updated = joins |> Map.keys() |> Enum.filter(&Map.has_key?(leaves, &1))
+    {count_metas(Map.drop(joins, updated)), count_metas(Map.drop(leaves, updated))}
+  end
+
+  defp current_meta(tab_id) do
+    case Presence.get_by_key(@topic, tab_id) do
+      %{metas: [meta | _]} -> meta
+      _ -> nil
+    end
   end
 
   defp patch_presence(conn) do
@@ -410,11 +525,11 @@ defmodule DstarDemoWeb.PresencePage do
     :ok
   end
 
-  defp notify_presence_stream(registry_tab, presence_instance) do
+  defp notify_presence_stream(registry_tab, presence_instance, message) do
     Dstar.Utility.StreamRegistry
     |> Registry.lookup({@stream_scope, registry_tab})
     |> Enum.each(fn
-      {pid, ^presence_instance} -> send(pid, {:presence_leave, registry_tab, presence_instance})
+      {pid, ^presence_instance} -> send(pid, message)
       _stale_or_missing_instance -> :ok
     end)
   end
@@ -440,9 +555,15 @@ defmodule DstarDemoWeb.PresencePage do
   defp sanitize_color(_), do: nil
 
   defp visitor_for(seed) do
-    index = :erlang.phash2(seed, length(@animals))
-    color = Enum.at(@colors, :erlang.phash2("color:" <> seed, length(@colors)))
-    %{seed: seed, name: "Visitor #{Enum.at(@animals, index)}", color: color}
+    character = Enum.at(@characters, :erlang.phash2(seed, length(@characters)))
+    %{seed: seed, name: character.name, color: character.color}
+  end
+
+  defp avatar_src(name) do
+    case Map.fetch(@avatars, name) do
+      {:ok, file} -> ~p"/images/expanse/#{file}"
+      :error -> nil
+    end
   end
 
   defp random_seed, do: Base.url_encode64(:crypto.strong_rand_bytes(8), padding: false)
@@ -485,6 +606,7 @@ defmodule DstarDemoWeb.PresencePage do
   defp color_class(_), do: "bg-success text-success-content"
 
   defp dot_class("join", color), do: swatch_class(color)
+  defp dot_class("rename", color), do: swatch_class(color)
   defp dot_class("ping", _), do: "bg-warning"
   defp dot_class("diff", _), do: "bg-info"
   defp dot_class(_, _), do: "bg-base-content/45"

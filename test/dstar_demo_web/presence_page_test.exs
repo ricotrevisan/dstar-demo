@@ -37,6 +37,13 @@ defmodule DstarDemoWeb.PresencePageTest do
     assert html =~ "el.dataset.presenceInstance = $presenceInstance"
     refute html =~ "$el.dataset.presenceInstance"
     assert html =~ "/_event/ping"
+    assert html =~ "/_event/rename"
+    # The visitor is a named character with a local portrait, not initials.
+    assert html =~ ~s[id="presence-you-name"]
+    # Kebab-case on purpose: HTML lowercases attribute names, so
+    # `data-bind:visitorName` would bind a stray `visitorname` signal.
+    assert html =~ "data-bind:visitor-name"
+    assert html =~ ~r{src="/images/expanse/\w+\.webp}
     assert html =~ ~s[data-presence-leave-url="/presence/_event/leave"]
     assert html =~ ~s[data-presence-instance=]
   end
@@ -414,6 +421,48 @@ defmodule DstarDemoWeb.PresencePageTest do
     assert app_js =~ "keepalive: true"
   end
 
+  test "POST /presence/_event/rename retitles the tab's presence entry", %{conn: conn} do
+    Phoenix.PubSub.subscribe(DstarDemo.PubSub, "presence:lobby")
+
+    tab_id = "presence-rename-tab"
+
+    supervisor =
+      start_supervised!({Task.Supervisor, name: DstarDemoWeb.PresencePageTest.RenameSupervisor})
+
+    Task.Supervisor.async_nolink(supervisor, fn ->
+      post_json(conn, ~p"/presence", %{
+        "tabId" => tab_id,
+        "visitorName" => "James Holden",
+        "visitorColor" => "sky",
+        "presenceInstance" => "rename-instance"
+      })
+    end)
+
+    assert_presence_diff(:joins, tab_id)
+
+    rename_conn =
+      post_json(conn, ~p"/presence/_event/rename", %{
+        "tabId" => tab_id,
+        "visitorName" => "Camina Drummer",
+        "presenceInstance" => "rename-instance"
+      })
+
+    # The event hands the rename to the stream and answers with nothing; the
+    # roster repaint arrives on the stream the tab already has open.
+    assert Dstar.Test.sse_events(rename_conn) == []
+
+    assert_receive %Phoenix.Socket.Broadcast{
+                     event: "presence_activity",
+                     payload: %{kind: "rename"} = payload
+                   },
+                   1_000
+
+    assert payload.message == "James Holden is now Camina Drummer"
+
+    assert %{metas: [%{name: "Camina Drummer", color: "sky"} | _]} =
+             DstarDemoWeb.Presence.get_by_key("presence:lobby", tab_id)
+  end
+
   test "presence_diff_summary counts joins and leaves" do
     diff = %{
       joins: %{"a" => %{metas: [%{}]}, "b" => %{metas: [%{}, %{}]}},
@@ -421,6 +470,15 @@ defmodule DstarDemoWeb.PresencePageTest do
     }
 
     assert DstarDemoWeb.PresencePage.presence_diff_summary(diff) == {3, 1}
+  end
+
+  test "presence_diff_summary treats a key on both sides as an update, not churn" do
+    diff = %{
+      joins: %{"a" => %{metas: [%{}]}, "b" => %{metas: [%{}]}},
+      leaves: %{"a" => %{metas: [%{}]}}
+    }
+
+    assert DstarDemoWeb.PresencePage.presence_diff_summary(diff) == {1, 0}
   end
 
   defp post_json(conn, path, signals) do
