@@ -40,6 +40,11 @@ config :dstar_demo, DstarDemoWeb.Endpoint,
 # priv/cert/selfsigned{_key}.pem (`mix dstar.https` / `mix phx.gen.cert`).
 # Set HTTPS=false to disable, or SSL_KEY_PATH/SSL_CERT_PATH to override.
 
+# Suppress noisy TLS warnings from plain HTTP requests hitting the HTTPS port.
+# Tooling that probes PORT+1 with an http:// URL floods the console with
+# `{:unsupported_record_type, 80}` alerts (80 is the "P" of "POST").
+config :ssl, log_level: :error
+
 # Reload browser tabs when matching files change.
 config :dstar_demo, DstarDemoWeb.Endpoint,
   live_reload: [

@@ -27,7 +27,7 @@ defmodule DstarDemoWeb.Endpoint do
     only: DstarDemoWeb.static_paths(),
     raise_on_missing_only: code_reloading?
 
-  if Mix.env() == :dev do
+  if Code.ensure_loaded?(Tidewave) do
     plug Tidewave
   end
 
