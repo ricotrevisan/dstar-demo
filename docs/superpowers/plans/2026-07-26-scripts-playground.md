@@ -738,8 +738,10 @@ Replace `"redirect helper emits a navigation script"` in `test/dstar_demo_web/sc
     response = conn |> get("/scripts?redirected=1") |> html_response(200)
 
     assert response =~ "redirect/3"
-    assert response =~ "full page load"
-    refute conn |> recycle() |> get("/scripts") |> html_response(200) =~ "full page load"
+    assert response =~ "which is why this log starts empty"
+
+    refute conn |> recycle() |> get("/scripts") |> html_response(200) =~
+             "which is why this log starts empty"
   end
 ```
 

@@ -30,7 +30,9 @@ defmodule DstarDemoWeb.ScriptsPage do
       script_source: first_preset,
       last_script_action: if(redirected?, do: "redirect complete", else: "idle"),
       console_payload: ~s({"demo": "dstar", "helper": "console_log"}),
-      console_level: "info"
+      console_level: "info",
+      redirect_path: "/scripts?redirected=1",
+      redirected?: redirected?
     )
   end
 
@@ -52,7 +54,8 @@ defmodule DstarDemoWeb.ScriptsPage do
           last_script_action: @last_script_action,
           script_source: @script_source,
           console_payload: @console_payload,
-          console_level: @console_level
+          console_level: @console_level,
+          redirect_path: @redirect_path
         }
       }
     >
@@ -131,7 +134,35 @@ defmodule DstarDemoWeb.ScriptsPage do
             </div>
           </div>
 
-          <.helper_log script_runs={@script_runs} last_script_action={@last_script_action} />
+          <div class="mt-6 border-t border-base-300 pt-5">
+            <label for="redirect-path" class="text-sm font-semibold text-base-content">
+              redirect/3 path
+            </label>
+            <p class="mt-1 text-xs text-base-content/60">
+              A full page load, so it clears everything below. That is the point.
+            </p>
+            <div class="mt-2 flex flex-wrap items-end gap-2">
+              <input
+                id="redirect-path"
+                type="text"
+                data-bind:redirect_path
+                value={@redirect_path}
+                class="min-w-0 flex-1 border border-base-300 bg-base-100 px-3 py-2 font-mono text-[13px] text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+              <.action_button
+                id="script-redirect"
+                label="Go"
+                icon="hero-arrow-turn-up-right-micro"
+                click={event("redirect")}
+              />
+            </div>
+          </div>
+
+          <.helper_log
+            script_runs={@script_runs}
+            last_script_action={@last_script_action}
+            redirected?={@redirected?}
+          />
         </section>
       </:demo>
 
@@ -235,24 +266,39 @@ defmodule DstarDemoWeb.ScriptsPage do
 
   def handle_event(conn, "redirect", signals) do
     runs = next_runs(signals)
+    path = to_string(signals["redirect_path"] || "")
 
-    conn
-    |> patch_signals(%{script_runs: runs, last_script_action: "redirect"})
-    |> prepend_log(runs, "redirect/3", "navigating to /scripts?redirected=1")
-    |> redirect("/scripts?redirected=1",
-      auto_remove: false,
-      attributes: %{"data-demo-script" => "redirect"}
-    )
+    # Dstar.Scripts.redirect/3 already runs the URL through Jason.encode!/1, so
+    # this guard is not a security control — it keeps the demo from wandering
+    # off to a page that cannot explain what just happened.
+    if String.starts_with?(path, "/") do
+      conn
+      |> patch_signals(%{script_runs: runs, last_script_action: "redirect"})
+      |> redirect(path,
+        auto_remove: false,
+        attributes: %{"data-demo-script" => "redirect"}
+      )
+    else
+      conn
+      |> patch_signals(%{script_runs: runs, last_script_action: "redirect rejected"})
+      |> prepend_log(
+        runs,
+        "redirect/3",
+        "Rejected — this demo stays in-app. Paths must start with /.",
+        tone: "warn"
+      )
+    end
   end
 
   def handle_event(conn, "clear", _signals) do
     conn
     |> patch_signals(%{script_runs: 0, last_script_action: "idle"})
-    |> patch(&log_entries/1, [], selector: "#helper-log-entries", mode: :outer)
+    |> patch(&log_entries/1, [redirected?: false], selector: "#helper-log-entries", mode: :outer)
   end
 
   attr :script_runs, :integer, required: true
   attr :last_script_action, :string, required: true
+  attr :redirected?, :boolean, required: true
 
   def helper_log(assigns) do
     ~H"""
@@ -283,22 +329,33 @@ defmodule DstarDemoWeb.ScriptsPage do
       </div>
 
       <p
+        :if={!@redirected?}
         class="mt-4 text-sm text-base-content/60"
         data-show="$script_runs === 0"
       >
         No helper has run yet.
       </p>
 
-      <.log_entries />
+      <.log_entries redirected?={@redirected?} />
     </div>
     """
   end
+
+  attr :redirected?, :boolean, required: true
 
   # Rendered standalone by the clear handler with mode: :outer, which is why it
   # is its own component rather than markup inlined above.
   def log_entries(assigns) do
     ~H"""
-    <div id="helper-log-entries" class="mt-4 grid gap-2"></div>
+    <div id="helper-log-entries" class="mt-4 grid gap-2">
+      <.log_row
+        :if={@redirected?}
+        id="log-row-redirected"
+        run={0}
+        helper="redirect/3"
+        detail="Navigated the browser here. A full page load, which is why this log starts empty."
+      />
+    </div>
     """
   end
 

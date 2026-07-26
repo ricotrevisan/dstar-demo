@@ -52,12 +52,37 @@ defmodule DstarDemoWeb.ScriptsPageTest do
     assert sse_body(conn) =~ "console.info"
   end
 
-  test "redirect helper emits a navigation script", %{conn: conn} do
-    conn = post_event(conn, "redirect", %{"script_runs" => 0})
+  test "redirect navigates to the visitor's path", %{conn: conn} do
+    conn =
+      post_event(conn, "redirect", %{
+        "script_runs" => 0,
+        "redirect_path" => "/scripts?redirected=1"
+      })
 
     assert_patched_signals(conn, %{script_runs: 1, last_script_action: "redirect"})
     assert sse_body(conn) =~ "/scripts?redirected=1"
     assert sse_body(conn) =~ ~s(data-demo-script="redirect")
+  end
+
+  test "redirect refuses to leave the demo", %{conn: conn} do
+    conn =
+      post_event(conn, "redirect", %{"script_runs" => 0, "redirect_path" => "https://example.com"})
+
+    body = sse_body(conn)
+
+    assert body =~ "stays in-app"
+    refute body =~ "example.com\""
+    refute body =~ ~s(data-demo-script="redirect")
+  end
+
+  test "arriving after a redirect explains the empty log", %{conn: conn} do
+    response = conn |> get("/scripts?redirected=1") |> html_response(200)
+
+    assert response =~ "redirect/3"
+    assert response =~ "which is why this log starts empty"
+
+    refute conn |> recycle() |> get("/scripts") |> html_response(200) =~
+             "which is why this log starts empty"
   end
 
   test "the log starts empty and announces itself", %{conn: conn} do
