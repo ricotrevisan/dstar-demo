@@ -77,46 +77,21 @@ defmodule DstarDemoWeb.PatchLabPage do
                   <span data-text="$patch_count">{@patch_count}</span>
                 </p>
               </div>
-              <.pill label="Datastar patch-elements" tone="info" />
+              <div class="flex items-center gap-3">
+                <button
+                  id="reset-stage"
+                  data-on:click={event("reset")}
+                  class="flex items-center gap-1.5 rounded-md border border-base-300 px-2.5 py-1.5 text-xs font-medium text-base-content/80 transition hover:border-base-content/40 hover:bg-base-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                >
+                  <.icon name="hero-arrow-path-micro" class="size-3.5" /> Reset stage
+                </button>
+                <.pill label="Datastar patch-elements" tone="info" />
+              </div>
             </div>
 
             <.patch_status selected_mode={@selected_mode} patch_count={@patch_count} />
 
-            <div id="lab-stage" class="border border-base-300 bg-base-100 p-4">
-              <div id="before-zone" class="space-y-2"></div>
-              <div id="lab-target" data-class={ring("#lab-target")} class={target_class()}>
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-sm font-semibold text-base-content">Target node</p>
-                  <.zone_id id="#lab-target" />
-                </div>
-                <p id="target-copy" class="mt-1 text-sm text-base-content/70">
-                  Inner content starts here.
-                </p>
-                <.list_label />
-                <div id="patch-list" data-class={ring("#patch-list")} class={list_class()}>
-                  <div id="seed-row" class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
-                    Seed row
-                  </div>
-                </div>
-              </div>
-              <div
-                id="anchor-row"
-                data-class={ring("#anchor-row")}
-                class="my-3 flex items-center justify-between gap-3 border border-info/30 bg-info/10 px-3 py-2 text-sm text-base-content"
-              >
-                <span>Sibling anchor for before and after</span>
-                <.zone_id id="#anchor-row" />
-              </div>
-              <div
-                id="removable-note"
-                data-class={ring("#removable-note")}
-                class="flex items-center justify-between gap-3 border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-base-content"
-              >
-                <span>Remove mode deletes this note.</span>
-                <.zone_id id="#removable-note" />
-              </div>
-              <div id="after-zone" class="space-y-2"></div>
-            </div>
+            <.lab_stage />
           </div>
         </section>
       </:demo>
@@ -183,11 +158,64 @@ defmodule DstarDemoWeb.PatchLabPage do
       do: apply_patch_mode(conn, unquote(mode), signals)
   end
 
+  def handle_event(conn, "reset", signals) do
+    mode = signals["selected_mode"] || "outer"
+
+    conn
+    |> patch_signals(%{patch_count: 0})
+    |> patch(&patch_status/1, selected_mode: mode, patch_count: 0)
+    |> patch(&lab_stage/1, [], selector: "#lab-stage", mode: :outer)
+  end
+
   # Keeps the mode buttons' highlight in sync with the $selected_mode
   # signal after events; the server only renders the initial state.
   defp mode_classes(mode) do
     "{'border-primary bg-primary text-primary-content': $selected_mode === '#{mode}', " <>
       "'border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100': $selected_mode !== '#{mode}'}"
+  end
+
+  # Reset re-renders this whole subtree with an outer patch, which is why the
+  # initial render and the reset handler share one component: remove deletes
+  # #removable-note for good, and without a way back that mode works exactly
+  # once per page load.
+  defp lab_stage(assigns) do
+    ~H"""
+    <div id="lab-stage" class="border border-base-300 bg-base-100 p-4">
+      <div id="before-zone" class="space-y-2"></div>
+      <div id="lab-target" data-class={ring("#lab-target")} class={target_class()}>
+        <div class="flex items-center justify-between gap-3">
+          <p class="text-sm font-semibold text-base-content">Target node</p>
+          <.zone_id id="#lab-target" />
+        </div>
+        <p id="target-copy" class="mt-1 text-sm text-base-content/70">
+          Inner content starts here.
+        </p>
+        <.list_label />
+        <div id="patch-list" data-class={ring("#patch-list")} class={list_class()}>
+          <div id="seed-row" class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
+            Seed row
+          </div>
+        </div>
+      </div>
+      <div
+        id="anchor-row"
+        data-class={ring("#anchor-row")}
+        class="my-3 flex items-center justify-between gap-3 border border-info/30 bg-info/10 px-3 py-2 text-sm text-base-content"
+      >
+        <span>Sibling anchor for before and after</span>
+        <.zone_id id="#anchor-row" />
+      </div>
+      <div
+        id="removable-note"
+        data-class={ring("#removable-note")}
+        class="flex items-center justify-between gap-3 border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-base-content"
+      >
+        <span>Remove mode deletes this note.</span>
+        <.zone_id id="#removable-note" />
+      </div>
+      <div id="after-zone" class="space-y-2"></div>
+    </div>
+    """
   end
 
   defp selector_for(mode), do: @mode_selectors[mode]
@@ -211,6 +239,7 @@ defmodule DstarDemoWeb.PatchLabPage do
     "{'ring-2 ring-primary': [#{modes}].includes($selected_mode)}"
   end
 
+  defp mono, do: "font-mono font-semibold text-base-content"
   defp target_class, do: "border border-primary/40 bg-primary/10 p-4"
   defp list_class, do: "mt-2 grid gap-2"
 
@@ -240,10 +269,13 @@ defmodule DstarDemoWeb.PatchLabPage do
       id="patch-status"
       class="mb-4 border border-base-300 bg-base-100 px-3 py-2 text-sm text-base-content/80"
     >
-      Last patch used <span class="font-mono font-semibold text-base-content">{@selected_mode}</span>
-      mode on
-      <span class="font-mono font-semibold text-base-content">{selector_for(@selected_mode)}</span>
-      at count <span class="font-mono font-semibold text-base-content">{@patch_count}</span>.
+      <%= if @patch_count == 0 do %>
+        Fresh stage, no patches yet. Next patch targets <span class={mono()}>{selector_for(@selected_mode)}</span>.
+      <% else %>
+        Last patch used <span class={mono()}>{@selected_mode}</span>
+        mode on <span class={mono()}>{selector_for(@selected_mode)}</span>
+        at count <span class={mono()}>{@patch_count}</span>.
+      <% end %>
     </div>
     """
   end
