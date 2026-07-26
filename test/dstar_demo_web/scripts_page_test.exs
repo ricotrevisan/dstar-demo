@@ -22,14 +22,6 @@ defmodule DstarDemoWeb.ScriptsPageTest do
     refute sse_body(conn) =~ "data-effect"
   end
 
-  test "execute helper emits its marker attribute", %{conn: conn} do
-    conn = post_event(conn, "execute", %{"script_runs" => 0})
-
-    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "execute_script"})
-    assert sse_body(conn) =~ "dstarScriptPulse"
-    assert sse_body(conn) =~ ~s(data-demo-script="execute")
-  end
-
   test "redirect helper emits a navigation script", %{conn: conn} do
     conn = post_event(conn, "redirect", %{"script_runs" => 0})
 
@@ -61,6 +53,34 @@ defmodule DstarDemoWeb.ScriptsPageTest do
     assert_patched_signals(conn, %{script_runs: 0, last_script_action: "idle"})
     assert sse_body(conn) =~ ~s(id="helper-log-entries")
     refute sse_body(conn) =~ "console_log/3"
+  end
+
+  test "the editor is bound to the script_source signal", %{conn: conn} do
+    response = conn |> get("/scripts") |> html_response(200)
+
+    assert response =~ ~s(id="script-editor")
+    assert response =~ "data-bind:script_source"
+    assert response =~ ~s(id="script-run")
+  end
+
+  test "run ships the visitor's own source verbatim", %{conn: conn} do
+    conn =
+      post_event(conn, "run", %{"script_runs" => 0, "script_source" => "window.ran = 41 + 1"})
+
+    body = sse_body(conn)
+
+    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "execute_script"})
+    assert body =~ "window.ran = 41 + 1"
+    assert body =~ ~s(data-demo-script="run")
+    refute body =~ "data-effect"
+  end
+
+  test "run rejects an empty editor instead of shipping a blank script", %{conn: conn} do
+    conn = post_event(conn, "run", %{"script_runs" => 0, "script_source" => "   "})
+    body = sse_body(conn)
+
+    assert body =~ "Nothing to run"
+    refute body =~ ~s(data-demo-script="run")
   end
 
   defp post_json(conn, path, signals) do

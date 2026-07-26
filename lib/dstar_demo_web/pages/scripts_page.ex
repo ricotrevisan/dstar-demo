@@ -1,49 +1,94 @@
 defmodule DstarDemoWeb.ScriptsPage do
   use DstarDemoWeb, :dstar_page
 
+  # Starter snippets. They are written into $script_source client-side, so
+  # picking one costs no round trip — only Run ships anything.
+  #
+  # SECURITY: these are the ONLY source of prefilled editor content. Never seed
+  # $script_source from a URL param. Typed JS reaches only the tab that typed it
+  # (signals are per-connection), so this page is self-XSS, which is not a
+  # vulnerability. A ?code= param would turn it into a real one: a shareable
+  # link that runs attacker-authored JS in a victim's browser.
+  @presets [
+    {"Pulse the page",
+     ~s[document.documentElement.dataset.dstarScriptPulse = String(Date.now())]},
+    {"Flash the page",
+     """
+     document.body.style.filter = "invert(1)"
+     setTimeout(function () { document.body.style.filter = "" }, 600)\
+     """},
+    {"Throw an error", ~s[throw new Error("This ran in your browser, not on the server.")]}
+  ]
+
   @impl Dstar.Page
   def mount(conn, params) do
     redirected? = Map.has_key?(params, "redirected")
+    {_label, first_preset} = hd(@presets)
 
     assign(conn,
       script_runs: 0,
+      script_source: first_preset,
       last_script_action: if(redirected?, do: "redirect complete", else: "idle")
     )
   end
 
   @impl Dstar.Page
   def render(assigns) do
-    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:scripts))
+    assigns =
+      assigns
+      |> Map.put(:snippet, DstarDemoWeb.Snippets.fetch!(:scripts))
+      |> Map.put(:presets, @presets)
 
     ~H"""
     <.demo_shell
       active="Scripts"
       title="Script helpers"
       summary="Dstar can append safe script actions over SSE for one-off browser effects, console diagnostics, and redirects."
-      signals={%{script_runs: @script_runs, last_script_action: @last_script_action}}
+      signals={
+        %{
+          script_runs: @script_runs,
+          last_script_action: @last_script_action,
+          script_source: @script_source
+        }
+      }
     >
       <:demo>
         <section class="border border-base-300 bg-base-200 p-5">
-          <div class="flex flex-wrap gap-2">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="font-mono text-xs tracking-wide text-base-content/65 uppercase">
+              Presets
+            </span>
+            <button
+              :for={{label, source} <- @presets}
+              id={"preset-" <> (label |> String.downcase() |> String.replace(" ", "-"))}
+              data-on:click={"$script_source = #{Jason.encode!(source)}"}
+              class="rounded-md border border-base-300 px-2.5 py-1.5 text-xs font-medium text-base-content/80 transition hover:border-base-content/40 hover:bg-base-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              {label}
+            </button>
+          </div>
+
+          <textarea
+            id="script-editor"
+            data-bind:script_source
+            rows="5"
+            spellcheck="false"
+            aria-label="JavaScript to run in your browser"
+            class="mt-3 w-full resize-y border border-base-300 bg-base-100 p-3 font-mono text-[13px] leading-6 text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >{@script_source}</textarea>
+
+          <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
             <.action_button
-              id="script-execute"
-              label="Execute"
+              id="script-run"
+              label="Run"
               icon="hero-bolt-micro"
-              click={event("execute")}
+              click={event("run")}
               active
             />
-            <.action_button
-              id="script-console"
-              label="Console log"
-              icon="hero-command-line-micro"
-              click={event("console")}
-            />
-            <.action_button
-              id="script-redirect"
-              label="Redirect preview"
-              icon="hero-arrow-turn-up-right-micro"
-              click={event("redirect")}
-            />
+            <p class="max-w-[52ch] text-xs leading-5 text-base-content/60">
+              This runs in your browser only. Signals are per-connection, so nothing you
+              type here can reach anyone else's tab.
+            </p>
           </div>
 
           <.helper_log script_runs={@script_runs} last_script_action={@last_script_action} />
@@ -102,21 +147,25 @@ defmodule DstarDemoWeb.ScriptsPage do
   end
 
   @impl Dstar.Page
-  def handle_event(conn, "execute", signals) do
+  def handle_event(conn, "run", signals) do
     runs = next_runs(signals)
+    source = to_string(signals["script_source"] || "")
 
-    conn
-    |> patch_signals(%{script_runs: runs, last_script_action: "execute_script"})
-    |> prepend_log(
-      runs,
-      "execute_script/3",
-      "sets document.documentElement.dataset.dstarScriptPulse"
-    )
-    |> execute_script(
-      "document.documentElement.dataset.dstarScriptPulse = #{Jason.encode!(Integer.to_string(runs))}",
-      auto_remove: false,
-      attributes: %{"data-demo-script" => "execute"}
-    )
+    if String.trim(source) == "" do
+      conn
+      |> patch_signals(%{script_runs: runs, last_script_action: "nothing to run"})
+      |> prepend_log(runs, "execute_script/3", "Nothing to run — the editor is empty.",
+        tone: "warn"
+      )
+    else
+      conn
+      |> patch_signals(%{script_runs: runs, last_script_action: "execute_script"})
+      |> prepend_log(runs, "execute_script/3", source)
+      |> execute_script(source,
+        auto_remove: false,
+        attributes: %{"data-demo-script" => "run"}
+      )
+    end
   end
 
   def handle_event(conn, "console", signals) do
