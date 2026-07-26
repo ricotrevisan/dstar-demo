@@ -3,6 +3,20 @@ defmodule DstarDemoWeb.PatchLabPage do
 
   @modes ~w(outer inner append prepend before after remove)
 
+  # The selector is half the API, so it is data rather than something buried in
+  # the case clause below: the header, the stage highlight, and the handler all
+  # read the same map, which keeps what the page claims and what it patches in
+  # step.
+  @mode_selectors %{
+    "outer" => "#lab-target",
+    "inner" => "#lab-target",
+    "append" => "#patch-list",
+    "prepend" => "#patch-list",
+    "before" => "#anchor-row",
+    "after" => "#anchor-row",
+    "remove" => "#removable-note"
+  }
+
   @impl Dstar.Page
   def mount(conn, _params) do
     assign(conn, selected_mode: "outer", patch_count: 0)
@@ -23,17 +37,21 @@ defmodule DstarDemoWeb.PatchLabPage do
       signals={%{selected_mode: @selected_mode, patch_count: @patch_count}}
     >
       <:demo>
-        <section class="grid gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
-          <div class="border border-base-300 bg-base-200 p-4">
+        <%!-- The mode list has to stay beside the target area: watching a patch
+        land is the whole demo, and a stacked layout puts seven tall buttons
+        between the control you clicked and the thing that changed. Side by side
+        from sm up, sticky so it stays in view while the stage grows. --%>
+        <section class="grid gap-5 sm:grid-cols-[minmax(0,190px)_minmax(0,1fr)] lg:grid-cols-[240px_minmax(0,1fr)]">
+          <div class="self-start border border-base-300 bg-base-200 p-4 sm:sticky sm:top-4">
             <p class="font-mono text-xs tracking-wide text-base-content/65 uppercase">Modes</p>
-            <div class="mt-4 grid gap-2">
+            <div class="mt-4 flex flex-wrap gap-2 sm:grid">
               <button
                 :for={mode <- @modes}
                 id={"patch-mode-#{mode}"}
                 data-on:click={"$selected_mode = '#{mode}'; #{event(mode)}"}
                 data-class={mode_classes(mode)}
                 class={[
-                  "flex items-center justify-between rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
+                  "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary",
                   @selected_mode == mode && "border-primary bg-primary text-primary-content",
                   @selected_mode != mode &&
@@ -51,8 +69,12 @@ defmodule DstarDemoWeb.PatchLabPage do
               <div>
                 <p class="text-sm font-semibold text-base-content">Patch target</p>
                 <p class="mt-1 font-mono text-xs text-base-content/65">
-                  Count: <span data-text="$patch_count">{@patch_count}</span>
-                  · mode: <span data-text="$selected_mode">{@selected_mode}</span>
+                  selector:
+                  <span class="text-base-content" data-text={selector_expr()}>
+                    {selector_for(@selected_mode)}
+                  </span>
+                  · mode: :<span data-text="$selected_mode">{@selected_mode}</span> · count:
+                  <span data-text="$patch_count">{@patch_count}</span>
                 </p>
               </div>
               <.pill label="Datastar patch-elements" tone="info" />
@@ -62,12 +84,16 @@ defmodule DstarDemoWeb.PatchLabPage do
 
             <div id="lab-stage" class="border border-base-300 bg-base-100 p-4">
               <div id="before-zone" class="space-y-2"></div>
-              <div id="lab-target" class="border border-primary/40 bg-primary/10 p-4">
-                <p class="text-sm font-semibold text-base-content">Target node</p>
+              <div id="lab-target" data-class={ring("#lab-target")} class={target_class()}>
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm font-semibold text-base-content">Target node</p>
+                  <.zone_id id="#lab-target" />
+                </div>
                 <p id="target-copy" class="mt-1 text-sm text-base-content/70">
                   Inner content starts here.
                 </p>
-                <div id="patch-list" class="mt-4 grid gap-2">
+                <.list_label />
+                <div id="patch-list" data-class={ring("#patch-list")} class={list_class()}>
                   <div id="seed-row" class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
                     Seed row
                   </div>
@@ -75,15 +101,19 @@ defmodule DstarDemoWeb.PatchLabPage do
               </div>
               <div
                 id="anchor-row"
-                class="my-3 border border-info/30 bg-info/10 px-3 py-2 text-sm text-base-content"
+                data-class={ring("#anchor-row")}
+                class="my-3 flex items-center justify-between gap-3 border border-info/30 bg-info/10 px-3 py-2 text-sm text-base-content"
               >
-                Sibling anchor for before and after
+                <span>Sibling anchor for before and after</span>
+                <.zone_id id="#anchor-row" />
               </div>
               <div
                 id="removable-note"
-                class="border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-base-content"
+                data-class={ring("#removable-note")}
+                class="flex items-center justify-between gap-3 border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-base-content"
               >
-                Remove mode deletes this note.
+                <span>Remove mode deletes this note.</span>
+                <.zone_id id="#removable-note" />
               </div>
               <div id="after-zone" class="space-y-2"></div>
             </div>
@@ -97,7 +127,8 @@ defmodule DstarDemoWeb.PatchLabPage do
           "inner replaces only target contents.",
           "append and prepend add children to a list.",
           "before and after insert siblings around an anchor.",
-          "remove deletes the selected element."
+          "remove deletes the selected element.",
+          "The selector is fixed per mode; the header and the ringed node show which one is next."
         ]} />
 
         <.prose>
@@ -159,6 +190,47 @@ defmodule DstarDemoWeb.PatchLabPage do
       "'border-base-300 text-base-content/80 hover:border-base-content/40 hover:bg-base-100': $selected_mode !== '#{mode}'}"
   end
 
+  defp selector_for(mode), do: @mode_selectors[mode]
+
+  # A lookup keyed by the same signal the buttons set, so the header shows the
+  # selector the next patch will use — before the round trip, not after it.
+  defp selector_expr do
+    pairs = Enum.map_join(@mode_selectors, ", ", fn {m, s} -> "'#{m}': '#{s}'" end)
+    "({#{pairs}})[$selected_mode]"
+  end
+
+  # Rings the element a mode is about to patch. Selecting a mode is a pure
+  # client-side signal write, so this has to be data-class rather than a
+  # server-rendered class: the ring moves on click, not on response.
+  defp ring(selector) do
+    modes =
+      @mode_selectors
+      |> Enum.filter(fn {_mode, sel} -> sel == selector end)
+      |> Enum.map_join(", ", fn {mode, _sel} -> "'#{mode}'" end)
+
+    "{'ring-2 ring-primary': [#{modes}].includes($selected_mode)}"
+  end
+
+  defp target_class, do: "border border-primary/40 bg-primary/10 p-4"
+  defp list_class, do: "mt-2 grid gap-2"
+
+  attr :id, :string, required: true
+
+  defp zone_id(assigns) do
+    ~H"""
+    <span class="shrink-0 font-mono text-[11px] text-base-content/50">{@id}</span>
+    """
+  end
+
+  defp list_label(assigns) do
+    ~H"""
+    <div class="mt-4 flex items-center justify-between gap-3">
+      <p class="text-xs text-base-content/60">List children</p>
+      <.zone_id id="#patch-list" />
+    </div>
+    """
+  end
+
   attr :selected_mode, :string, required: true
   attr :patch_count, :integer, required: true
 
@@ -169,7 +241,9 @@ defmodule DstarDemoWeb.PatchLabPage do
       class="mb-4 border border-base-300 bg-base-100 px-3 py-2 text-sm text-base-content/80"
     >
       Last patch used <span class="font-mono font-semibold text-base-content">{@selected_mode}</span>
-      mode at count <span class="font-mono font-semibold text-base-content">{@patch_count}</span>.
+      mode on
+      <span class="font-mono font-semibold text-base-content">{selector_for(@selected_mode)}</span>
+      at count <span class="font-mono font-semibold text-base-content">{@patch_count}</span>.
     </div>
     """
   end
@@ -201,12 +275,7 @@ defmodule DstarDemoWeb.PatchLabPage do
         patch(conn, &lab_target/1, [count: count], selector: "#lab-target", mode: :outer)
 
       "inner" ->
-        patch_elements(
-          conn,
-          ~s(<p class="text-sm font-semibold text-base-content">Inner patch #{count}</p><p class="mt-1 text-sm text-base-content/70">Only the children changed.</p>),
-          selector: "#lab-target",
-          mode: :inner
-        )
+        patch(conn, &inner_body/1, [count: count], selector: "#lab-target", mode: :inner)
 
       "append" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
@@ -237,15 +306,39 @@ defmodule DstarDemoWeb.PatchLabPage do
     end
   end
 
+  # The outer and inner replacements have to re-declare the zone ids and their
+  # data-class rings: a patch replaces the markup wholesale, and an unlabelled
+  # #patch-list would leave the header pointing at a selector the stage no
+  # longer shows.
   defp lab_target(assigns) do
     ~H"""
-    <div id="lab-target" class="border border-primary bg-primary/10 p-4">
-      <p class="text-sm font-semibold text-base-content">Outer patch replaced this node.</p>
+    <div id="lab-target" data-class={ring("#lab-target")} class={target_class()}>
+      <div class="flex items-center justify-between gap-3">
+        <p class="text-sm font-semibold text-base-content">Outer patch replaced this node.</p>
+        <.zone_id id="#lab-target" />
+      </div>
       <p class="mt-1 text-sm text-base-content/70">Patch count {@count}</p>
-      <div id="patch-list" class="mt-4 grid gap-2">
+      <.list_label />
+      <div id="patch-list" data-class={ring("#patch-list")} class={list_class()}>
         <div id={"outer-seed-#{@count}"} class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
           New list seed
         </div>
+      </div>
+    </div>
+    """
+  end
+
+  defp inner_body(assigns) do
+    ~H"""
+    <div class="flex items-center justify-between gap-3">
+      <p class="text-sm font-semibold text-base-content">Inner patch {@count}</p>
+      <.zone_id id="#lab-target" />
+    </div>
+    <p class="mt-1 text-sm text-base-content/70">Only the children changed.</p>
+    <.list_label />
+    <div id="patch-list" data-class={ring("#patch-list")} class={list_class()}>
+      <div id={"inner-seed-#{@count}"} class="bg-base-200 px-3 py-2 text-sm text-base-content/80">
+        New list seed
       </div>
     </div>
     """
