@@ -34,7 +34,7 @@ defmodule DstarDemoWeb.PatchLabPage do
       active="Patch Lab"
       title="Patch lab"
       summary="Each control sends a page event that uses a different Datastar patch mode. The target area makes insertion, replacement, and removal explicit."
-      signals={%{selected_mode: @selected_mode, patch_count: @patch_count}}
+      signals={%{selected_mode: @selected_mode, hovered_mode: "", patch_count: @patch_count}}
     >
       <:demo>
         <%!-- The mode list has to stay beside the target area: watching a patch
@@ -49,6 +49,8 @@ defmodule DstarDemoWeb.PatchLabPage do
                 :for={mode <- @modes}
                 id={"patch-mode-#{mode}"}
                 data-on:click={"$selected_mode = '#{mode}'; #{event(mode)}"}
+                data-on:mouseenter={"$hovered_mode = '#{mode}'"}
+                data-on:mouseleave="$hovered_mode = ''"
                 data-class={mode_classes(mode)}
                 class={[
                   "flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm font-medium capitalize transition",
@@ -227,16 +229,17 @@ defmodule DstarDemoWeb.PatchLabPage do
     "({#{pairs}})[$selected_mode]"
   end
 
-  # Rings the element a mode is about to patch. Selecting a mode is a pure
-  # client-side signal write, so this has to be data-class rather than a
-  # server-rendered class: the ring moves on click, not on response.
+  # Rings the element a mode is about to patch. Hover takes precedence so the
+  # stage previews a button's target without changing the selected mode; when
+  # hover ends, the ring returns to the selected target. Both interactions are
+  # client-side signal writes, so the ring moves without a server round trip.
   defp ring(selector) do
     modes =
       @mode_selectors
       |> Enum.filter(fn {_mode, sel} -> sel == selector end)
       |> Enum.map_join(", ", fn {mode, _sel} -> "'#{mode}'" end)
 
-    "{'ring-2 ring-primary': [#{modes}].includes($selected_mode)}"
+    "{'ring-2 ring-primary': [#{modes}].includes($hovered_mode || $selected_mode)}"
   end
 
   defp mono, do: "font-mono font-semibold text-base-content"

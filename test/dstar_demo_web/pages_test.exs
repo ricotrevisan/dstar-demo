@@ -309,12 +309,17 @@ defmodule DstarDemoWeb.PagesTest do
     assert response =~ ~s[$component_kind === &#39;profile&#39;]
   end
 
-  test "GET /patch-lab binds the header and mode buttons to signals", %{conn: conn} do
+  test "GET /patch-lab binds the header, mode buttons, and target preview to signals", %{
+    conn: conn
+  } do
     response = conn |> get(~p"/patch-lab") |> html_response(200)
 
     assert response =~ ~s[data-text="$patch_count"]
     assert response =~ ~s[data-text="$selected_mode"]
     assert response =~ ~s[$selected_mode === &#39;outer&#39;]
+    assert response =~ ~s[data-on:mouseenter="$hovered_mode = &#39;append&#39;"]
+    assert response =~ ~s[data-on:mouseleave="$hovered_mode = ''"]
+    assert response =~ ~s[includes($hovered_mode || $selected_mode)]
   end
 
   test "signals inspector snapshot does not re-embed itself", %{conn: conn} do
