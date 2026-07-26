@@ -41,10 +41,14 @@ abstract warning and becomes the thing they just did.
 `lib/dstar_demo_web/snippets.ex`, and one small page script (~25 lines) for the
 console mirror and DOM residue observer.
 
-**Out:** the snippet-drift problem (`snippets.ex` hand-copies handler source and
-will drift again when these handlers change) — worth fixing repo-wide, not
-here. No changes to `demo_components.ex`; the `:note` slot already exists and
+**Out:** No changes to `demo_components.ex`; the `:note` slot already exists and
 just needs a caller.
+
+**Not a risk:** snippet drift. `snippets.ex` hand-copies handler source, but
+`test/dstar_demo_web/snippet_drift_test.exs` already asserts that every `wiring`
+snippet still appears verbatim (modulo leading whitespace) in the page module it
+claims to quote. Changing these handlers *will* fail that test until the snippet
+is updated in the same commit, which is the desired behaviour.
 
 ## Decisions
 
