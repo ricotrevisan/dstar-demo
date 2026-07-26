@@ -457,6 +457,11 @@ defmodule DstarDemoWeb.Snippets do
 
         conn
         |> patch_signals(%{script_runs: runs, last_script_action: "execute_script"})
+        |> prepend_log(
+          runs,
+          "execute_script/3",
+          "sets document.documentElement.dataset.dstarScriptPulse"
+        )
         |> execute_script(
           "document.documentElement.dataset.dstarScriptPulse = \#{Jason.encode!(Integer.to_string(runs))}",
           auto_remove: false,

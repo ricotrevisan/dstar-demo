@@ -38,6 +38,31 @@ defmodule DstarDemoWeb.ScriptsPageTest do
     assert sse_body(conn) =~ ~s(data-demo-script="redirect")
   end
 
+  test "the log starts empty and announces itself", %{conn: conn} do
+    response = conn |> get("/scripts") |> html_response(200)
+
+    assert response =~ ~s(id="helper-log-entries")
+    assert response =~ "No helper has run yet."
+  end
+
+  test "each helper prepends a log row naming the helper", %{conn: conn} do
+    conn = post_event(conn, "console", %{"script_runs" => 2})
+    body = sse_body(conn)
+
+    assert body =~ ~s(selector #helper-log-entries)
+    assert body =~ "mode prepend"
+    assert body =~ "console_log/3"
+    assert body =~ "run 3"
+  end
+
+  test "clear empties the log and resets the run count", %{conn: conn} do
+    conn = post_event(conn, "clear", %{"script_runs" => 7})
+
+    assert_patched_signals(conn, %{script_runs: 0, last_script_action: "idle"})
+    assert sse_body(conn) =~ ~s(id="helper-log-entries")
+    refute sse_body(conn) =~ "console_log/3"
+  end
+
   defp post_json(conn, path, signals) do
     conn = Plug.Test.init_test_session(conn, %{})
     csrf = Plug.CSRFProtection.get_csrf_token()
