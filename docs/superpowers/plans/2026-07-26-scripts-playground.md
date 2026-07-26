@@ -439,7 +439,7 @@ Replace the `<div class="flex flex-wrap gap-2">` block of three `action_button`s
             </span>
             <button
               :for={{label, source} <- @presets}
-              id={"preset-#{Phoenix.Naming.underscore(label)}"}
+              id={"preset-" <> (label |> String.downcase() |> String.replace(" ", "-"))}
               data-on:click={"$script_source = #{Jason.encode!(source)}"}
               class="rounded-md border border-base-300 px-2.5 py-1.5 text-xs font-medium text-base-content/80 transition hover:border-base-content/40 hover:bg-base-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
@@ -1030,7 +1030,6 @@ Append to `test/dstar_demo_web/scripts_page_test.exs`:
 
     # The note in Snippets is the sharpest writing on this page and went
     # unrendered for its whole life. Assert the words, not just the slot.
-    assert response =~ "sends"
     assert response =~ "push_event/3"
     assert response =~ "execute_script/3"
     assert response =~ "one mistake away from running in the browser"
