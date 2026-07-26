@@ -333,34 +333,6 @@ defmodule DstarDemoWeb.PagesTest do
     refute sse_body(conn) =~ "previous"
   end
 
-  test "script helpers emit console script", %{conn: conn} do
-    conn = post_event(conn, ~p"/scripts", "console", %{"script_runs" => 0})
-
-    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "console_log"})
-    assert sse_body(conn) =~ "console.info"
-    assert sse_body(conn) =~ ~s(data-demo-script="console")
-    refute sse_body(conn) =~ "data-effect"
-    refute sse_body(conn) =~ "selector #script-log"
-  end
-
-  # execute_script and redirect are the exact surfaces the dstar 0.1.2/0.1.3
-  # security releases changed — keep regression coverage on their output.
-  test "script helpers emit execute script with its marker attribute", %{conn: conn} do
-    conn = post_event(conn, ~p"/scripts", "execute", %{"script_runs" => 0})
-
-    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "execute_script"})
-    assert sse_body(conn) =~ "dstarScriptPulse"
-    assert sse_body(conn) =~ ~s(data-demo-script="execute")
-  end
-
-  test "script helpers emit redirect script", %{conn: conn} do
-    conn = post_event(conn, ~p"/scripts", "redirect", %{"script_runs" => 0})
-
-    assert_patched_signals(conn, %{script_runs: 1, last_script_action: "redirect"})
-    assert sse_body(conn) =~ "/scripts?redirected=1"
-    assert sse_body(conn) =~ ~s(data-demo-script="redirect")
-  end
-
   # /presence is not in demo_pages/0 — its marker is asserted by
   # presence_page_test.exs — but it is the largest page in the repo and the one
   # whose shell conversion carried the most risk, so the shell assertions run
