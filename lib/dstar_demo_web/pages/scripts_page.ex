@@ -28,7 +28,9 @@ defmodule DstarDemoWeb.ScriptsPage do
     assign(conn,
       script_runs: 0,
       script_source: first_preset,
-      last_script_action: if(redirected?, do: "redirect complete", else: "idle")
+      last_script_action: if(redirected?, do: "redirect complete", else: "idle"),
+      console_payload: ~s({"demo": "dstar", "helper": "console_log"}),
+      console_level: "info"
     )
   end
 
@@ -48,7 +50,9 @@ defmodule DstarDemoWeb.ScriptsPage do
         %{
           script_runs: @script_runs,
           last_script_action: @last_script_action,
-          script_source: @script_source
+          script_source: @script_source,
+          console_payload: @console_payload,
+          console_level: @console_level
         }
       }
     >
@@ -89,6 +93,42 @@ defmodule DstarDemoWeb.ScriptsPage do
               This runs in your browser only. Signals are per-connection, so nothing you
               type here can reach anyone else's tab.
             </p>
+          </div>
+
+          <div class="mt-6 border-t border-base-300 pt-5">
+            <label for="console-payload" class="text-sm font-semibold text-base-content">
+              console_log/3 payload
+            </label>
+            <p class="mt-1 text-xs text-base-content/60">
+              JSON. It reaches the helper as a map, which
+              <code class="font-mono">Jason.encode!/1</code>
+              renders into the console call.
+            </p>
+            <div class="mt-2 flex flex-wrap items-end gap-2">
+              <input
+                id="console-payload"
+                type="text"
+                data-bind:console_payload
+                value={@console_payload}
+                class="min-w-0 flex-1 border border-base-300 bg-base-100 px-3 py-2 font-mono text-[13px] text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              />
+              <select
+                id="console-level"
+                data-bind:console_level
+                aria-label="Console level"
+                class="border border-base-300 bg-base-100 px-3 py-2 font-mono text-[13px] text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              >
+                <option value="info" selected={@console_level == "info"}>info</option>
+                <option value="warn" selected={@console_level == "warn"}>warn</option>
+                <option value="error" selected={@console_level == "error"}>error</option>
+              </select>
+              <.action_button
+                id="script-console"
+                label="Log it"
+                icon="hero-command-line-micro"
+                click={event("console")}
+              />
+            </div>
           </div>
 
           <.helper_log script_runs={@script_runs} last_script_action={@last_script_action} />
@@ -170,19 +210,27 @@ defmodule DstarDemoWeb.ScriptsPage do
 
   def handle_event(conn, "console", signals) do
     runs = next_runs(signals)
+    level = console_level(signals["console_level"])
+    payload = to_string(signals["console_payload"] || "")
 
-    conn
-    |> patch_signals(%{script_runs: runs, last_script_action: "console_log"})
-    |> prepend_log(
-      runs,
-      "console_log/3",
-      ~s(level: info\n%{demo: "dstar", helper: "console_log", run: #{runs}})
-    )
-    |> console_log(%{demo: "dstar", helper: "console_log", run: runs},
-      level: :info,
-      auto_remove: false,
-      attributes: %{"data-demo-script" => "console"}
-    )
+    case Jason.decode(payload) do
+      {:ok, decoded} ->
+        conn
+        |> patch_signals(%{script_runs: runs, last_script_action: "console_log"})
+        |> prepend_log(runs, "console_log/3", "level: #{level}\n#{payload}")
+        |> console_log(decoded,
+          level: level,
+          auto_remove: false,
+          attributes: %{"data-demo-script" => "console"}
+        )
+
+      {:error, _reason} ->
+        conn
+        |> patch_signals(%{script_runs: runs, last_script_action: "console_log rejected"})
+        |> prepend_log(runs, "console_log/3", "Rejected — #{payload} is not valid JSON.",
+          tone: "warn"
+        )
+    end
   end
 
   def handle_event(conn, "redirect", signals) do
@@ -296,6 +344,12 @@ defmodule DstarDemoWeb.ScriptsPage do
       mode: :prepend
     )
   end
+
+  # A signal is untrusted input, so the level is matched rather than converted:
+  # String.to_existing_atom/1 on an arbitrary signal is a way to crash a handler.
+  defp console_level("warn"), do: :warn
+  defp console_level("error"), do: :error
+  defp console_level(_), do: :info
 
   defp next_runs(signals) do
     case signals["script_runs"] do

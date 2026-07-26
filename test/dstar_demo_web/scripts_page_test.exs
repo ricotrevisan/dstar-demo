@@ -13,13 +13,43 @@ defmodule DstarDemoWeb.ScriptsPageTest do
     post_json(conn, "/scripts/_event/" <> event, signals)
   end
 
-  test "console helper emits a console script", %{conn: conn} do
-    conn = post_event(conn, "console", %{"script_runs" => 0})
+  test "console ships the visitor's payload at the chosen level", %{conn: conn} do
+    conn =
+      post_event(conn, "console", %{
+        "script_runs" => 0,
+        "console_payload" => ~s({"who":"reader"}),
+        "console_level" => "warn"
+      })
+
+    body = sse_body(conn)
 
     assert_patched_signals(conn, %{script_runs: 1, last_script_action: "console_log"})
+    assert body =~ "console.warn"
+    assert body =~ ~s({"who":"reader"})
+    assert body =~ ~s(data-demo-script="console")
+    refute body =~ "data-effect"
+  end
+
+  test "console rejects malformed JSON without calling the helper", %{conn: conn} do
+    conn =
+      post_event(conn, "console", %{"script_runs" => 0, "console_payload" => "{not json"})
+
+    body = sse_body(conn)
+
+    assert body =~ "not valid JSON"
+    refute body =~ "console."
+    refute body =~ ~s(data-demo-script="console")
+  end
+
+  test "console falls back to info for an unknown level", %{conn: conn} do
+    conn =
+      post_event(conn, "console", %{
+        "script_runs" => 0,
+        "console_payload" => ~s({"a":1}),
+        "console_level" => "bogus"
+      })
+
     assert sse_body(conn) =~ "console.info"
-    assert sse_body(conn) =~ ~s(data-demo-script="console")
-    refute sse_body(conn) =~ "data-effect"
   end
 
   test "redirect helper emits a navigation script", %{conn: conn} do
