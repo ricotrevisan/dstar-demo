@@ -388,14 +388,18 @@ defmodule DstarDemoWeb.PagesTest do
       assert response =~ ~s[href="#comparison"], "#{path} has no comparison jump link"
       assert response =~ ~s[id="comparison"], "#{path} renders no comparison section"
       assert response =~ "If this were LiveView"
-      assert response =~ "illustrative, never compiled or run"
+
+      # The design spec requires the LiveView side be explicitly labelled
+      # illustrative, since nothing compiles or runs it. The label lives on the
+      # code pane's own caption.
+      assert response =~ "illustrative", "#{path} does not label the LiveView side illustrative"
     end
   end
 
-  # The notes are stored as plain text and rendered by rich_text/1. Before that
-  # existed they were interpolated straight into HEEx, so readers saw literal
-  # backticks and asterisks — twelve of them on one page.
-  test "comparison notes render markup rather than showing its markers", %{conn: conn} do
+  # The comparisons no longer render a <:note>, but their prose is still written
+  # by hand in HEEx, where a stray backtick or ** would show up literally rather
+  # than as markup. That is how the note bug reached the final review gate.
+  test "comparison prose shows no literal markup markers", %{conn: conn} do
     for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
       response = conn |> recycle() |> get(path) |> html_response(200)
 
@@ -408,18 +412,19 @@ defmodule DstarDemoWeb.PagesTest do
 
       refute text =~ "`", "#{path} shows a literal backtick in its comparison"
       refute text =~ "**", "#{path} shows literal bold markers in its comparison"
-
-      # …because the markers became elements, not because they were dropped.
-      note = LazyHTML.query(comparison, "aside")
-      assert LazyHTML.query(note, "code") |> Enum.count() > 0, "#{path}: note has no <code>"
-      assert LazyHTML.query(note, "p") |> Enum.count() > 1, "#{path}: note is one paragraph"
     end
   end
 
   test "a comparison labels the LiveView side as illustrative", %{conn: conn} do
     response = conn |> recycle() |> get(~p"/search") |> html_response(200)
 
-    assert response =~ "illustrative, never compiled or run"
+    document = LazyHTML.from_document(response)
+    captions = document |> LazyHTML.query("#comparison figcaption") |> LazyHTML.text()
+
+    # One pane is captioned with the real source path it was excerpted from; the
+    # other is captioned "illustrative", because nothing compiles or runs it.
+    assert captions =~ "illustrative"
+    assert captions =~ "lib/dstar_demo_web/pages/active_search_page.ex"
 
     # The LiveView snippet is displayed as highlighted source, so its bindings
     # appear as escaped text rather than as live attributes on this page.

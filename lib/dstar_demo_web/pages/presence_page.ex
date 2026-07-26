@@ -297,8 +297,6 @@ defmodule DstarDemoWeb.PresencePage do
           <:liveview>
             <.code_block language="elixir" label="illustrative" code={@snippet.liveview} />
           </:liveview>
-
-          <:note><.rich_text text={@snippet.note} /></:note>
         </.compare>
       </:comparison>
     </.demo_shell>

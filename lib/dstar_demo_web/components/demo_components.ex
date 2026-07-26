@@ -346,19 +346,14 @@ defmodule DstarDemoWeb.DemoComponents do
       <div class="grid gap-5 lg:grid-cols-2">
         <div class="min-w-0">
           <h3 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
-            <span class="inline-block size-2 shrink-0 bg-primary" aria-hidden="true"></span>
-            Dstar <span class="font-normal text-base-content/70">— this page's real code</span>
+            <span class="inline-block size-2 shrink-0 bg-primary" aria-hidden="true"></span> Dstar
           </h3>
           {render_slot(@dstar)}
         </div>
 
         <div class="min-w-0">
           <h3 class="mb-2 flex flex-wrap items-baseline gap-x-2 text-sm font-semibold">
-            <span class="inline-block size-2 shrink-0 bg-base-300" aria-hidden="true"></span>
-            LiveView
-            <span class="font-normal text-base-content/70">
-              — illustrative, never compiled or run
-            </span>
+            <span class="inline-block size-2 shrink-0 bg-base-300" aria-hidden="true"></span> LiveView
           </h3>
           {render_slot(@liveview)}
         </div>
