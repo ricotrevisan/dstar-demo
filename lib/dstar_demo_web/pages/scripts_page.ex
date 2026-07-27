@@ -163,6 +163,8 @@ defmodule DstarDemoWeb.ScriptsPage do
             last_script_action={@last_script_action}
             redirected?={@redirected?}
           />
+
+          <.observability_panels />
         </section>
       </:demo>
 
@@ -338,6 +340,95 @@ defmodule DstarDemoWeb.ScriptsPage do
 
       <.log_entries redirected?={@redirected?} />
     </div>
+    """
+  end
+
+  # The panels are inert markup; this one script fills both. It lives here
+  # rather than in app.js because app.js is shared by all eight demos and
+  # nothing outside this page needs a console wrapper.
+  #
+  # HEEx does not interpolate {...} or ${...} inside <script>, so this is plain
+  # JavaScript, not a template.
+  defp observability_panels(assigns) do
+    ~H"""
+    <div class="mt-5 grid gap-5 lg:grid-cols-2">
+      <div class="border border-base-300 bg-base-100 p-4">
+        <p class="text-sm font-semibold text-base-content">Console mirror</p>
+        <p class="mt-1 text-xs leading-5 text-base-content/60">
+          Open your DevTools console (⌘⌥J) — those are the real entries. This panel is a
+          copy, and it mirrors everything the page logs, framework noise included.
+        </p>
+        <div id="console-mirror" class="mt-3 grid max-h-56 gap-1 overflow-y-auto"></div>
+      </div>
+
+      <div class="border border-base-300 bg-base-100 p-4">
+        <p class="text-sm font-semibold text-base-content">Script residue</p>
+        <p class="mt-1 text-xs leading-5 text-base-content/60">
+          <code class="font-mono">auto_remove: false</code>
+          leaves the tag in the DOM. These are the ones still there.
+        </p>
+        <pre
+          id="script-residue"
+          class="mt-3 max-h-56 overflow-auto font-mono text-xs leading-5 text-base-content/75"
+        ></pre>
+      </div>
+    </div>
+
+    <script>
+      (function () {
+        var mirror = document.getElementById("console-mirror")
+        var residue = document.getElementById("script-residue")
+        if (!mirror || !residue) return
+
+        function append(level, text) {
+          var row = document.createElement("div")
+          row.className = "border-l-2 border-base-300 pl-2 font-mono text-xs text-base-content/80"
+          row.textContent = level + ": " + text
+          mirror.prepend(row)
+          while (mirror.children.length > 20) mirror.lastChild.remove()
+        }
+
+        ;["log", "info", "warn", "error"].forEach(function (level) {
+          var original = console[level].bind(console)
+          console[level] = function () {
+            var args = Array.prototype.slice.call(arguments)
+            original.apply(console, args)
+            append(
+              level,
+              args
+                .map(function (a) {
+                  return typeof a === "string" ? a : JSON.stringify(a)
+                })
+                .join(" ")
+            )
+          }
+        })
+
+        window.addEventListener("error", function (e) {
+          append("uncaught", e.message)
+        })
+
+        function paint() {
+          var tags = document.querySelectorAll("script[data-demo-script]")
+          var text = "No script tags left in the DOM yet."
+
+          if (tags.length > 0) {
+            text = Array.prototype.map
+              .call(tags, function (t) {
+                return "script[data-demo-script=" + t.dataset.demoScript + "]"
+              })
+              .join("\n")
+          }
+
+          // Updating this observed subtree schedules the observer again. Only
+          // mutate when the residue actually changed so that second pass stops.
+          if (residue.textContent !== text) residue.textContent = text
+        }
+
+        new MutationObserver(paint).observe(document.body, {childList: true, subtree: true})
+        paint()
+      })()
+    </script>
     """
   end
 

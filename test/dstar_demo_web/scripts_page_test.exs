@@ -138,6 +138,16 @@ defmodule DstarDemoWeb.ScriptsPageTest do
     refute body =~ ~s(data-demo-script="run")
   end
 
+  test "the page carries the console mirror and residue panels", %{conn: conn} do
+    response = conn |> get("/scripts") |> html_response(200)
+
+    assert response =~ ~s(id="console-mirror")
+    assert response =~ ~s(id="script-residue")
+    assert response =~ "MutationObserver"
+    assert response =~ "residue.textContent !== text"
+    assert response =~ "Open your DevTools console"
+  end
+
   defp post_json(conn, path, signals) do
     conn = Plug.Test.init_test_session(conn, %{})
     csrf = Plug.CSRFProtection.get_csrf_token()
