@@ -22,6 +22,19 @@ defmodule DstarDemoWeb.HomePage do
           Dstar server UI showcase
         </h1>
         <p class="mt-4 max-w-[68ch] text-base leading-7 text-base-content/70">
+          <a
+            href="https://hexdocs.pm/dstar"
+            class="font-medium text-base-content underline decoration-base-content/30 underline-offset-2 transition hover:decoration-primary"
+          >
+            Dstar
+          </a>
+          is an Elixir library that renders Phoenix pages over <a
+            href="https://data-star.dev"
+            class="font-medium text-base-content underline decoration-base-content/30 underline-offset-2 transition hover:decoration-primary"
+          >Datastar</a>, a hypermedia framework: the browser sends signals, the server
+          answers with HTML patches over SSE, and no client framework is involved.
+        </p>
+        <p class="mt-4 max-w-[68ch] text-base leading-7 text-base-content/70">
           Eight focused Dstar.Page modules for commands, signals, element patches, streaming,
           components, and presence — each page is one module and one router line, shown beside
           how Phoenix LiveView would solve the same problem.
