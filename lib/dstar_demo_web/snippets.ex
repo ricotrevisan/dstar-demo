@@ -521,64 +521,98 @@ defmodule DstarDemoWeb.Snippets do
       source: "#{@pages}/presence_page.ex",
       wiring_language: "elixir",
       wiring: """
-      Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
-      remember_presence_instance(registry_tab, presence_instance)
+      def handle_connect(conn, _params) do
+        # ...
 
-      {:ok, _} =
-        Presence.track(self(), @topic, tab_id, %{
-          name: name,
-          color: color,
-          status: "active",
-          presence_instance: presence_instance,
-          last_seen: System.system_time(:second)
-        })
+        Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
+        remember_presence_instance(registry_tab, presence_instance)
+
+        {:ok, _} =
+          Presence.track(self(), @topic, tab_id, %{
+            name: name,
+            color: color,
+            status: "active",
+            presence_instance: presence_instance,
+            last_seen: System.system_time(:second)
+          })
+
+        # ...
+      end
+
+      # ...
+
+      # Sent by the pagehide beacon in app.js. The response body is never read
+      # by the browser, so the already-started SSE stream simply closes empty.
+      def handle_event(conn, "leave", signals) do
+        # Same validation the stream registered under, so the lookup can't miss.
+        registry_tab = Dstar.Utility.StreamRegistry.tab_id(conn)
+        presence_instance = sanitize_token(signals["presenceInstance"])
+
+        if registry_tab && presence_instance do
+          notify_presence_stream(
+            registry_tab,
+            presence_instance,
+            {:presence_leave, registry_tab, presence_instance}
+          )
+        end
+
+        conn
+      end
+
+      # ...
+
+      def handle_info({:presence_leave, tab, presence_instance}, conn) do
+        if tab != nil and tab == conn.assigns[:registry_tab] and
+             presence_instance == conn.assigns.presence_instance do
+          {:halt, conn}
+        else
+          conn
+        end
+      end
+
+      # ...
+
+      # Runs on every exit from the library's receive loop. Dstar releases the
+      # StreamRegistry key itself; this is the app-owned state handle_connect/2
+      # acquired. Both operations are scoped to self(), so a takeover cannot
+      # clobber what the replacing stream already tracked for the same tab.
+      @impl Dstar.Page
+      def handle_disconnect(conn) do
+        if tab_id = conn.assigns[:tab_id] do
+          Presence.untrack(self(), @topic, tab_id)
+        end
+
+        Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, @topic)
+      end
       """,
       liveview: """
       # Illustrative LiveView equivalent — not compiled or run.
       def mount(_params, _session, socket) do
-        socket =
-          assign(socket,
-            visitor_name: random_name(),
-            visitor_color: random_color(),
-            activity: []
-          )
+        # ...
 
         if connected?(socket) do
           Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
 
+          # Same meta, minus presence_instance — and socket.id instead of a
+          # client-sent tab_id, because the process itself is the identity.
           {:ok, _} =
             Presence.track(self(), @topic, socket.id, %{
-              name: socket.assigns.visitor_name,
-              color: socket.assigns.visitor_color,
+              name: name,
+              color: color,
               status: "active",
               last_seen: System.system_time(:second)
             })
         end
 
-        {:ok, assign(socket, roster: Presence.list(@topic))}
+        # ...
       end
 
-      def handle_info(%Phoenix.Socket.Broadcast{event: "presence_diff"}, socket) do
-        {:noreply, assign(socket, roster: Presence.list(@topic))}
-      end
+      # ... presence_diff, ping, and rename handlers elided — they mirror
+      # the Dstar side.
 
-      def handle_info({:ping, name}, socket) do
-        {:noreply, assign(socket, activity: [name | socket.assigns.activity])}
-      end
-
-      def handle_event("ping", _params, socket) do
-        Phoenix.PubSub.broadcast(
-          DstarDemo.PubSub,
-          @topic,
-          {:ping, socket.assigns.visitor_name}
-        )
-
-        {:noreply, socket}
-      end
-
-      # No untrack is written anywhere. Presence is bound to self(), and the
-      # LiveView process dying on disconnect removes the entry — including when
-      # it dies by crashing.
+      # Leaving takes zero parts. No untrack is written anywhere: Presence
+      # is bound to self(), and the LiveView process dying on disconnect
+      # removes the entry — including when it dies by crashing.
       """,
       note: """
       LiveView wins, and this demo shows precisely why. Presence is keyed to a

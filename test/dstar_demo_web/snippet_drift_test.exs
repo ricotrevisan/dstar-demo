@@ -7,6 +7,9 @@ defmodule DstarDemoWeb.SnippetDriftTest do
   Comparison matching ignores each line's leading whitespace: moving markup
   between slots re-indents it, which is not drift. Everything that matters —
   renamed functions, changed arguments, deleted calls — still fails.
+
+  A snippet may stitch several excerpts together with lines containing only
+  `# ...`; each stitched chunk must appear verbatim in the source.
   """
   use ExUnit.Case, async: true
 
@@ -31,15 +34,19 @@ defmodule DstarDemoWeb.SnippetDriftTest do
     test "#{demo}: the How-it-works snippet appears in the page module" do
       source = flush(File.read!(@entry.source))
 
-      assert String.contains?(source, flush(@entry.wiring)), """
-      The wiring snippet for #{@demo} no longer appears in #{@entry.source}.
+      for chunk <- String.split(flush(@entry.wiring), ~r/^#\s\.\.\.$/m),
+          chunk = String.trim(chunk),
+          chunk != "" do
+        assert String.contains?(source, chunk), """
+        A wiring excerpt for #{@demo} no longer appears in #{@entry.source}.
 
-      Either the page changed and the snippet in DstarDemoWeb.Snippets must be
-      updated to match, or the snippet was mistyped.
+        Either the page changed and the snippet in DstarDemoWeb.Snippets must be
+        updated to match, or the snippet was mistyped.
 
-      Snippet:
-      #{@entry.wiring}
-      """
+        Excerpt:
+        #{chunk}
+        """
+      end
     end
   end
 
