@@ -82,9 +82,7 @@ defmodule DstarDemo.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "db.up", "ecto.setup", "assets.setup", "assets.build"],
-      "db.up": ["cmd docker compose up -d --wait"],
-      "db.down": ["cmd docker compose down"],
+      setup: ["deps.get", "ecto.setup", "assets.setup", "assets.build"],
       "ecto.setup": ["ecto.create", "ecto.migrate"],
       "ecto.reset": ["ecto.drop", "ecto.setup"],
       test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],

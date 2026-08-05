@@ -28,42 +28,6 @@ if config_env() != :test do
   config :dstar_demo, DstarDemoWeb.Endpoint, http: [port: port]
 end
 
-# In development, automatically enable local HTTPS when certificate files
-# exist — either the mkcert names from the README or the names written by
-# `mix dstar.https` and `mix phx.gen.cert`. HTTPS listens one port higher
-# than PORT, so PORT=4000 serves HTTP on 4000 and HTTPS on 4001.
-{dev_ssl_key_path, dev_ssl_cert_path} =
-  case {System.get_env("SSL_KEY_PATH"), System.get_env("SSL_CERT_PATH")} do
-    {nil, nil} ->
-      [
-        {"priv/cert/localhost-key.pem", "priv/cert/localhost.pem"},
-        {"priv/cert/selfsigned_key.pem", "priv/cert/selfsigned.pem"}
-      ]
-      |> Enum.find({nil, nil}, fn {key, cert} ->
-        File.exists?(key) and File.exists?(cert)
-      end)
-
-    {key, cert} ->
-      {key || "priv/cert/localhost-key.pem", cert || "priv/cert/localhost.pem"}
-  end
-
-https_enabled? =
-  config_env() == :dev and
-    String.downcase(System.get_env("HTTPS", "true")) in ["1", "true", "yes", "on"] and
-    is_binary(dev_ssl_key_path) and File.exists?(dev_ssl_key_path) and
-    is_binary(dev_ssl_cert_path) and File.exists?(dev_ssl_cert_path)
-
-if https_enabled? do
-  config :dstar_demo, DstarDemoWeb.Endpoint,
-    https: [
-      ip: {127, 0, 0, 1},
-      port: port + 1,
-      cipher_suite: :strong,
-      keyfile: dev_ssl_key_path,
-      certfile: dev_ssl_cert_path
-    ]
-end
-
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||

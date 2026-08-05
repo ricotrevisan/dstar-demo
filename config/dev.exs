@@ -1,13 +1,11 @@
 import Config
 
-# Postgres, as brought up by `docker compose up -d` (see compose.yml).
-# Port 5433 deliberately, so this never collides with a system Postgres
-# on the default 5432.
+# The shared local Postgres (infra-postgres, see ~/dev/devops/infra).
 config :dstar_demo, DstarDemo.Repo,
   username: System.get_env("PGUSER", "postgres"),
   password: System.get_env("PGPASSWORD", "postgres"),
   hostname: System.get_env("PGHOST", "localhost"),
-  port: String.to_integer(System.get_env("PGPORT", "5433")),
+  port: String.to_integer(System.get_env("PGPORT", "5432")),
   database: "dstar_demo_dev",
   stacktrace: true,
   show_sensitive_data_on_connection_error: true,
@@ -19,10 +17,13 @@ config :dstar_demo, DstarDemo.Repo,
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
+port = System.get_env("PORT", "4000") |> String.to_integer()
+
 config :dstar_demo, DstarDemoWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
-  http: [ip: {127, 0, 0, 1}],
+  http: [ip: {127, 0, 0, 1}, port: port],
+  url: [host: "dstar-demo.localhost", scheme: "https", port: 443],
   check_origin: false,
   code_reloader: true,
   debug_errors: true,
@@ -31,19 +32,6 @@ config :dstar_demo, DstarDemoWeb.Endpoint,
     esbuild: {Esbuild, :install_and_run, [:dstar_demo, ~w(--sourcemap=inline --watch)]},
     tailwind: {Tailwind, :install_and_run, [:dstar_demo, ~w(--watch)]}
   ]
-
-# ## SSL Support
-#
-# Local HTTPS is handled by config/runtime.exs: it adds an HTTPS listener
-# on PORT+1 automatically when certificate files exist — either
-# priv/cert/localhost{-key}.pem (mkcert, see the README) or
-# priv/cert/selfsigned{_key}.pem (`mix dstar.https` / `mix phx.gen.cert`).
-# Set HTTPS=false to disable, or SSL_KEY_PATH/SSL_CERT_PATH to override.
-
-# Suppress noisy TLS warnings from plain HTTP requests hitting the HTTPS port.
-# Tooling that probes PORT+1 with an http:// URL floods the console with
-# `{:unsupported_record_type, 80}` alerts (80 is the "P" of "POST").
-config :ssl, log_level: :error
 
 # Reload browser tabs when matching files change.
 config :dstar_demo, DstarDemoWeb.Endpoint,

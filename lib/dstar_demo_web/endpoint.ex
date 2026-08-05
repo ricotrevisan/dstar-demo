@@ -28,7 +28,20 @@ defmodule DstarDemoWeb.Endpoint do
     raise_on_missing_only: code_reloading?
 
   if Code.ensure_loaded?(Tidewave) do
-    plug Tidewave
+    # Tidewave derives its default allowed origin from the endpoint's :url config
+    # (dstar-demo.localhost), but we also serve/control it via localhost:PORT, so
+    # allow both origins explicitly (dev-only dependency).
+    # NB: read only the narrow keys — reading the whole Endpoint config would pull
+    # the live_reload regex into the .app file and break serialization.
+    url_host =
+      Keyword.get(Application.compile_env(:dstar_demo, [DstarDemoWeb.Endpoint, :url], []), :host)
+
+    http_port =
+      Keyword.get(Application.compile_env(:dstar_demo, [DstarDemoWeb.Endpoint, :http], []), :port)
+
+    @tidewave_allowed_origins ["//#{url_host}", "//localhost:#{http_port}"]
+
+    plug Tidewave, allowed_origins: @tidewave_allowed_origins
   end
 
   # Code reloading can be explicitly enabled under the
