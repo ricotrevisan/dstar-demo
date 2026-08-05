@@ -54,6 +54,16 @@ defmodule DstarDemoWeb.PagesTest do
     assert submit_action =~ "/_event/validate"
     assert submit_action =~ "contentType: 'form'"
 
+    # Debounced live validation: each input posts the whole form 240ms
+    # after the user stops typing, and 1Password leaves the fields alone.
+    for input <- [email_input, first_name_input] do
+      [check_action] = LazyHTML.attribute(input, "data-on:input__debounce.240ms")
+      assert check_action =~ "/_event/check"
+      assert check_action =~ "contentType: 'form'"
+      assert LazyHTML.attribute(input, "data-1p-ignore") == [""]
+      assert LazyHTML.attribute(input, "data-op-ignore") == [""]
+    end
+
     assert LazyHTML.attribute(form, "novalidate") == [""]
     assert LazyHTML.attribute(email_input, "required") == [""]
     assert LazyHTML.attribute(first_name_input, "minlength") == ["2"]
@@ -246,6 +256,32 @@ defmodule DstarDemoWeb.PagesTest do
     assert sse_body(conn) =~ "server rejected"
     assert sse_body(conn) =~ "Use an @example.com email"
     assert sse_body(conn) =~ "Use at least 2 characters"
+  end
+
+  test "debounced input check patches live feedback per field", %{conn: conn} do
+    conn =
+      post_form_event(conn, ~p"/commands", "check", %{
+        "email" => "ada@example.com",
+        "first_name" => "A",
+        "last_name" => "Lovelace"
+      })
+
+    conn
+    |> assert_patched_element("#form-status")
+    |> assert_patched_element("#access-pass-email-feedback")
+    |> assert_patched_element("#access-pass-first_name-feedback")
+    |> assert_patched_element("#access-pass-last_name-feedback")
+    |> assert_patched_element("#validation-panel")
+    |> assert_patched_element("#form-payload")
+
+    body = sse_body(conn)
+    assert body =~ "live checking"
+    assert body =~ "Company email accepted"
+    assert body =~ "Use at least 2 characters"
+    assert body =~ "2/3 valid"
+    # The live check shows what has reached the server, without a submit verdict.
+    refute body =~ "server rejected"
+    refute body =~ "Server accepted the form data"
   end
 
   test "form reset event clears validation feedback", %{conn: conn} do

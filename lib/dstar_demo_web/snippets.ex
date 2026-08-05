@@ -17,11 +17,15 @@ defmodule DstarDemoWeb.Snippets do
       source: "#{@pages}/commands_page.ex",
       wiring_language: "elixir",
       wiring: """
-      def handle_event(conn, "validate", params) do
+      def handle_event(conn, "check", params) do
         validation = validate(params)
-        intent = if ready?(validation), do: "accepted", else: "rejected"
-        submitted = submitted_fields(params)
 
+        conn
+        |> patch_validation(validation, "typing")
+        |> patch(&payload_panel/1, submitted: submitted_fields(params))
+      end
+      # ...
+      defp patch_validation(conn, validation, intent) do
         conn
         |> patch(&status_badge/1, intent: intent)
         |> patch(&field_feedback/1,
@@ -41,7 +45,6 @@ defmodule DstarDemoWeb.Snippets do
           intent: intent
         )
         |> patch(&validation_panel/1, validation: validation, intent: intent)
-        |> patch(&payload_panel/1, submitted: submitted)
       end
       """,
       liveview: """
@@ -65,9 +68,15 @@ defmodule DstarDemoWeb.Snippets do
       def render(assigns) do
         ~H\"\"\"
         <.form for={@form} id="access-pass-form" phx-change="validate" phx-submit="save">
-          <.input field={@form[:email]} type="email" label="Email" required />
-          <.input field={@form[:first_name]} type="text" label="First name" minlength="2" />
-          <.input field={@form[:last_name]} type="text" label="Last name" />
+          <.input
+            field={@form[:email]}
+            type="email"
+            label="Email"
+            required
+            phx-debounce="240"
+          />
+          <.input field={@form[:first_name]} type="text" label="First name" minlength="2" phx-debounce="240" />
+          <.input field={@form[:last_name]} type="text" label="Last name" phx-debounce="240" />
 
           <.button phx-disable-with="Checking…">Request access</.button>
         </.form>
@@ -78,16 +87,19 @@ defmodule DstarDemoWeb.Snippets do
       LiveView wins this one outright. A changeset plus `to_form/2` gives you
       field-level errors, `<.input>` renders each error next to its own field,
       `used_input?/1` keeps untouched fields quiet until they are touched,
-      `phx-disable-with` handles the in-flight state, and form recovery after a
-      dropped connection is automatic. The Dstar version hand-rolls all of it:
-      the six `patch/3` calls and the whole `field_feedback/1` component exist to
-      do what `<.input>` does for free.
+      `phx-debounce` is a plain attribute rather than a Datastar modifier, and
+      `phx-disable-with` handles the in-flight state. The Dstar version
+      hand-rolls all of it: the debounced `check` event, the six `patch/3` calls
+      behind `patch_validation/3`, and the whole `field_feedback/1` component
+      exist to do what `<.input>` does for free.
 
       What Dstar buys in exchange is that this is a plain HTML form. It posts
       with `contentType: 'form'`, so the server receives ordinary form params and
       the markup would still submit with JavaScript disabled — and the response
       names exactly which six fragments change, rather than diffing a rendered
-      tree the server had to keep.
+      tree the server had to keep. LiveView also needs that tree: its debounced
+      validation still rerenders the whole form on every round trip, where Dstar
+      patches only the feedback fragments and never touches the inputs.
       """
     },
     active_search: %{

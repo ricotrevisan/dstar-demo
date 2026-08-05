@@ -18,7 +18,7 @@ defmodule DstarDemoWeb.CommandsPage do
     <.demo_shell
       active="Form Validation"
       title="Form data validation"
-      summary="Datastar submits a real form with contentType: 'form'. The server validates the fields and patches only the status, field feedback, and submitted payload."
+      summary="Every input validates live on a 240ms debounce — Datastar posts the real form with contentType: 'form', and the server patches field feedback, status, and payload as you type."
     >
       <:demo>
         <section class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
@@ -102,18 +102,19 @@ defmodule DstarDemoWeb.CommandsPage do
       <:how_it_works>
         <.key_points items={[
           "novalidate keeps the browser from intercepting the demo.",
-          "contentType: 'form' sends form fields instead of Datastar signals.",
-          "The inputs keep their values while server-owned feedback is patched.",
+          "data-on:input__debounce.240ms fires 240ms after you stop typing in any field.",
+          "contentType: 'form' serializes the whole form, so every check validates all three fields.",
           "patch/3 updates status, field errors, summary, and payload fragments."
         ]} />
 
         <.prose>
           The form is a real <code class="font-mono text-sm">&lt;form&gt;</code>: Datastar posts it
           with <code class="font-mono text-sm">contentType: 'form'</code>, so the server receives
-          ordinary form fields rather than signals. Validation runs server-side and the response
-          patches six separate fragments — the status badge, three field-feedback spans, the
-          validation panel and the payload panel — leaving the inputs themselves untouched. That is
-          why what you typed survives the round trip.
+          ordinary form fields rather than signals. Each input carries <code class="font-mono text-sm">data-on:input__debounce.240ms</code>, so 240ms after you
+          stop typing the whole form is posted and validated. The response patches six separate
+          fragments — the status badge, three field-feedback spans, the validation panel and the
+          payload panel — leaving the inputs themselves untouched. That is why what you typed
+          survives the round trip. Submitting runs the same validation with the final verdict.
         </.prose>
 
         <div class="mt-6">
@@ -153,8 +154,32 @@ defmodule DstarDemoWeb.CommandsPage do
   def handle_event(conn, "validate", params) do
     validation = validate(params)
     intent = if ready?(validation), do: "accepted", else: "rejected"
-    submitted = submitted_fields(params)
 
+    conn
+    |> patch_validation(validation, intent)
+    |> patch(&payload_panel/1, submitted: submitted_fields(params))
+  end
+
+  # Debounced per-input: fires 240ms after the user stops typing in any
+  # field. contentType: 'form' serializes the whole form, so every check
+  # validates all three fields together and patches live feedback.
+  def handle_event(conn, "check", params) do
+    validation = validate(params)
+
+    conn
+    |> patch_validation(validation, "typing")
+    |> patch(&payload_panel/1, submitted: submitted_fields(params))
+  end
+
+  def handle_event(conn, "reset", _signals) do
+    conn
+    |> patch_validation(validate(%{}), "idle")
+    |> patch(&payload_panel/1, submitted: %{})
+  end
+
+  # Patches the server-owned fragments shared by submit, live check, and
+  # reset: status badge, the three field feedbacks, and the validation panel.
+  defp patch_validation(conn, validation, intent) do
     conn
     |> patch(&status_badge/1, intent: intent)
     |> patch(&field_feedback/1,
@@ -174,32 +199,6 @@ defmodule DstarDemoWeb.CommandsPage do
       intent: intent
     )
     |> patch(&validation_panel/1, validation: validation, intent: intent)
-    |> patch(&payload_panel/1, submitted: submitted)
-  end
-
-  def handle_event(conn, "reset", _signals) do
-    validation = validate(%{})
-
-    conn
-    |> patch(&status_badge/1, intent: "idle")
-    |> patch(&field_feedback/1,
-      name: "email",
-      hint: "Company addresses only — try ada@example.com.",
-      field: validation["email"],
-      intent: "idle"
-    )
-    |> patch(&field_feedback/1,
-      name: "first_name",
-      field: validation["first_name"],
-      intent: "idle"
-    )
-    |> patch(&field_feedback/1,
-      name: "last_name",
-      field: validation["last_name"],
-      intent: "idle"
-    )
-    |> patch(&validation_panel/1, validation: validation, intent: "idle")
-    |> patch(&payload_panel/1, submitted: %{})
   end
 
   attr :label, :string, required: true
@@ -228,6 +227,9 @@ defmodule DstarDemoWeb.CommandsPage do
         autocomplete={@autocomplete}
         placeholder={@placeholder}
         aria-describedby={@feedback_id}
+        data-1p-ignore
+        data-op-ignore
+        data-on:input__debounce.240ms={event("check", opts: "{contentType: 'form'}")}
         class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-3 text-base text-base-content transition placeholder:text-base-content/65 focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
         {@rest}
       />
@@ -254,7 +256,7 @@ defmodule DstarDemoWeb.CommandsPage do
         "mt-2 block text-sm transition",
         @intent == "idle" && "text-base-content/65",
         @intent != "idle" && @field.valid && "text-success",
-        @intent == "rejected" && !@field.valid && "font-medium text-error"
+        @intent in ["rejected", "typing"] && !@field.valid && "font-medium text-error"
       ]}
     >
       {field_feedback_message(@intent, @field, @hint)}
@@ -272,6 +274,7 @@ defmodule DstarDemoWeb.CommandsPage do
         "inline-flex items-center px-2 py-0.5 font-mono text-xs",
         @intent == "accepted" && "bg-primary text-primary-content",
         @intent == "rejected" && "bg-error/20 text-base-content",
+        @intent == "typing" && "bg-info/15 text-base-content",
         @intent == "idle" && "bg-base-300 text-base-content/70"
       ]}
     >
@@ -347,9 +350,8 @@ defmodule DstarDemoWeb.CommandsPage do
     <div class={[
       "border px-3 py-2 text-base-content",
       @field.valid && @intent != "idle" && "border-success/40 bg-success/10",
-      !@field.valid && @intent == "rejected" && "border-error/40 bg-error/10",
-      (@intent == "idle" || (!@field.valid && @intent != "rejected")) &&
-        "border-base-300 bg-base-200"
+      !@field.valid && @intent in ["rejected", "typing"] && "border-error/40 bg-error/10",
+      @intent == "idle" && "border-base-300 bg-base-200"
     ]}>
       <span class="font-medium">{@label}</span>
       <span class="mt-1 block text-xs opacity-80">{chip_message(@intent, @field)}</span>
@@ -402,6 +404,7 @@ defmodule DstarDemoWeb.CommandsPage do
 
   defp status_label("accepted"), do: "accepted"
   defp status_label("rejected"), do: "server rejected"
+  defp status_label("typing"), do: "live checking"
   defp status_label(_intent), do: "not submitted"
 
   defp validation_title("idle", _ready?), do: "Waiting for the server to validate"
