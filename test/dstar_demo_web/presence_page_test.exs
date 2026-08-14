@@ -28,10 +28,13 @@ defmodule DstarDemoWeb.PresencePageTest do
     # and a killed-and-retried stream re-kills its sibling forever (the
     # client resets its retry counter on every 200, so any finite budget is
     # ineffective). online/pageshow handlers reconnect when it matters.
-    assert html =~ ~s[data-init="@post(location.pathname, {retryMaxCount: 0})"]
+    # dstar main (unreleased, after 0.2.0) collapses leading slashes in
+    # location.pathname so the request cannot become protocol-relative.
+    assert html =~
+             ~s[data-init="@post(location.pathname.replace(/^\\/+/, &#39;/&#39;), {retryMaxCount: 0})"]
 
     assert html =~
-             ~s[data-on:online__window="@post(location.pathname, {retryMaxCount: 0})"]
+             ~s[data-on:online__window="@post(location.pathname.replace(/^\\/+/, &#39;/&#39;), {retryMaxCount: 0})"]
 
     assert html =~ "evt.persisted &amp;&amp; ($presenceInstance = crypto.randomUUID()"
     assert html =~ "el.dataset.presenceInstance = $presenceInstance"
