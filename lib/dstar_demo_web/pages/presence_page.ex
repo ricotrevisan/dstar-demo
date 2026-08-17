@@ -57,9 +57,6 @@ defmodule DstarDemoWeb.PresencePage do
     name = name || visitor.name
     color = sanitize_color(signals["visitorColor"]) || visitor.color
 
-    Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
-    remember_presence_instance(registry_tab, presence_instance)
-
     {:ok, _} =
       Presence.track(self(), @topic, tab_id, %{
         name: name,
@@ -69,6 +66,9 @@ defmodule DstarDemoWeb.PresencePage do
         last_seen: System.system_time(:second)
       })
 
+    presence_stream_topic = presence_stream_topic(registry_tab, presence_instance)
+    Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
+    subscribe_presence_stream(presence_stream_topic)
     broadcast_activity("#{name} joined the room", "join")
 
     conn =
@@ -76,6 +76,7 @@ defmodule DstarDemoWeb.PresencePage do
       |> assign(:tab_id, tab_id)
       |> assign(:registry_tab, registry_tab)
       |> assign(:presence_instance, presence_instance)
+      |> assign(:presence_stream_topic, presence_stream_topic)
 
     case safe_presence_patch(conn, fn conn ->
            conn
@@ -173,16 +174,15 @@ defmodule DstarDemoWeb.PresencePage do
     end
   end
 
-  # Runs on every exit from the library's receive loop. Dstar releases the
-  # StreamRegistry key itself; this is the app-owned state handle_connect/2
-  # acquired. Both operations are scoped to self(), so a takeover cannot
-  # clobber what the replacing stream already tracked for the same tab.
+  # Runs on every exit from the library's receive loop. Dstar releases its
+  # stream claim; this page releases the Presence and PubSub state it acquired.
   @impl Dstar.Page
   def handle_disconnect(conn) do
     if tab_id = conn.assigns[:tab_id] do
       Presence.untrack(self(), @topic, tab_id)
     end
 
+    unsubscribe_presence_stream(conn.assigns[:presence_stream_topic])
     Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, @topic)
   end
 
@@ -504,34 +504,32 @@ defmodule DstarDemoWeb.PresencePage do
   end
 
   # No client auto-retry. Duplicated tabs share the sessionStorage tabId, so
-  # a retried stream re-kills its sibling forever; the client resets its retry
-  # counter on every 200, making any finite budget ineffective. Dstar 0.1.4
-  # ends a taken-over stream cleanly, which alone stops the loop under HTTP/1.1
-  # — but this demo serves HTTP/2, where the connection process does not trap
-  # exits and the takeover kill still surfaces as a transport error the client
-  # retries. data-on:online__window and the pageshow handler cover the cases
-  # where reconnecting actually matters.
+  # a replaced stream that immediately retries would reclaim the key and make
+  # the two tabs replace one another forever. data-on:online__window and the
+  # pageshow handler cover the cases where reconnecting actually matters.
   defp room_connect, do: connect(opts: "{retryMaxCount: 0}")
 
-  defp remember_presence_instance(nil, _presence_instance), do: :ok
+  defp presence_stream_topic(nil, _presence_instance), do: nil
 
-  defp remember_presence_instance(registry_tab, presence_instance) do
-    Registry.update_value(
-      Dstar.Utility.StreamRegistry,
-      {@stream_scope, registry_tab},
-      fn _value -> presence_instance end
-    )
-
-    :ok
+  defp presence_stream_topic(registry_tab, presence_instance) do
+    key = Base.url_encode64(registry_tab <> <<0>> <> presence_instance, padding: false)
+    @topic <> ":stream:" <> key
   end
 
+  defp subscribe_presence_stream(nil), do: :ok
+  defp subscribe_presence_stream(topic), do: Phoenix.PubSub.subscribe(DstarDemo.PubSub, topic)
+
+  defp unsubscribe_presence_stream(nil), do: :ok
+
+  defp unsubscribe_presence_stream(topic),
+    do: Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, topic)
+
   defp notify_presence_stream(registry_tab, presence_instance, message) do
-    Dstar.Utility.StreamRegistry
-    |> Registry.lookup({@stream_scope, registry_tab})
-    |> Enum.each(fn
-      {pid, ^presence_instance} -> send(pid, message)
-      _stale_or_missing_instance -> :ok
-    end)
+    Phoenix.PubSub.broadcast(
+      DstarDemo.PubSub,
+      presence_stream_topic(registry_tab, presence_instance),
+      message
+    )
   end
 
   # Signals are client-controlled: reject non-strings and cap lengths so a

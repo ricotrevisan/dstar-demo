@@ -536,9 +536,6 @@ defmodule DstarDemoWeb.Snippets do
       def handle_connect(conn, _params) do
         # ...
 
-        Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
-        remember_presence_instance(registry_tab, presence_instance)
-
         {:ok, _} =
           Presence.track(self(), @topic, tab_id, %{
             name: name,
@@ -547,6 +544,10 @@ defmodule DstarDemoWeb.Snippets do
             presence_instance: presence_instance,
             last_seen: System.system_time(:second)
           })
+
+        presence_stream_topic = presence_stream_topic(registry_tab, presence_instance)
+        Phoenix.PubSub.subscribe(DstarDemo.PubSub, @topic)
+        subscribe_presence_stream(presence_stream_topic)
 
         # ...
       end
@@ -584,16 +585,15 @@ defmodule DstarDemoWeb.Snippets do
 
       # ...
 
-      # Runs on every exit from the library's receive loop. Dstar releases the
-      # StreamRegistry key itself; this is the app-owned state handle_connect/2
-      # acquired. Both operations are scoped to self(), so a takeover cannot
-      # clobber what the replacing stream already tracked for the same tab.
+      # Runs on every exit from the library's receive loop. Dstar releases its
+      # stream claim; this page releases the Presence and PubSub state it acquired.
       @impl Dstar.Page
       def handle_disconnect(conn) do
         if tab_id = conn.assigns[:tab_id] do
           Presence.untrack(self(), @topic, tab_id)
         end
 
+        unsubscribe_presence_stream(conn.assigns[:presence_stream_topic])
         Phoenix.PubSub.unsubscribe(DstarDemo.PubSub, @topic)
       end
       """,

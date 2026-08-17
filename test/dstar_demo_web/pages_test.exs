@@ -170,10 +170,8 @@ defmodule DstarDemoWeb.PagesTest do
                Dstar.Page.Plug.init({:stream, DstarDemoWeb.StreamingDashboardPage})
              )
 
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
-             {{:dstar_demo, :streaming_dashboard}, tab_id}
-           ) == []
+    assert Dstar.Utility.StreamRegistry.owner({{:dstar_demo, :streaming_dashboard}, tab_id}) ==
+             :error
   end
 
   test "streaming stream unregisters its tab key on graceful completion", %{conn: conn} do
@@ -184,10 +182,9 @@ defmodule DstarDemoWeb.PagesTest do
     # The registered process (this test process, under keep-alive: the
     # connection process) outlives the completed stream; a stale entry
     # would let the next connect kill it mid-unrelated-request.
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
+    assert Dstar.Utility.StreamRegistry.owner(
              {{:dstar_demo, :streaming_dashboard}, "stream-complete-tab"}
-           ) == []
+           ) == :error
   end
 
   test "patch lab events exercise every Datastar patch mode", %{conn: conn} do

@@ -87,10 +87,8 @@ defmodule DstarDemoWeb.PresencePageTest do
     # Bandit keep-alive connection process. The page must have cleaned up
     # everything scoped to the stream, or later requests on this process
     # inherit the subscription, registry key, and presence entry.
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
-             {{:dstar_demo, :presence}, "presence-closed-tab"}
-           ) == []
+    assert Dstar.Utility.StreamRegistry.owner({{:dstar_demo, :presence}, "presence-closed-tab"}) ==
+             :error
 
     refute DstarDemoWeb.Presence.list("presence:lobby")
            |> Map.has_key?("presence-closed-tab")
@@ -116,12 +114,8 @@ defmodule DstarDemoWeb.PresencePageTest do
       # must not satisfy this before our own stream has registered.
       assert_presence_diff(:joins, "presence-test-tab")
 
-      assert [{pid, _presence_instance}] =
-               Registry.lookup(
-                 Dstar.Utility.StreamRegistry,
-                 {{:dstar_demo, :presence}, "presence-test-tab"}
-               )
-
+      key = {{:dstar_demo, :presence}, "presence-test-tab"}
+      assert {:ok, pid, _claim} = Dstar.Utility.StreamRegistry.owner(key)
       assert pid == task.pid
     after
       Task.shutdown(task, :brutal_kill)
@@ -174,7 +168,7 @@ defmodule DstarDemoWeb.PresencePageTest do
   test "an oversized tabId streams without dedup but still tracks presence", %{conn: conn} do
     Phoenix.PubSub.subscribe(DstarDemo.PubSub, "presence:lobby")
 
-    # dstar 0.1.4 rejects a tabId over 64 bytes rather than registering it,
+    # Dstar rejects a tabId over 64 bytes rather than registering it,
     # so the stream runs undeduplicated and the leave beacon has nothing to
     # look up. Presence is keyed separately and must still work.
     raw_tab = String.duplicate("t", 100)
@@ -196,15 +190,9 @@ defmodule DstarDemoWeb.PresencePageTest do
 
     # No registry entry under either the raw or the truncated form — an
     # unusable tabId means no deduplication at all.
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
-             {{:dstar_demo, :presence}, raw_tab}
-           ) == []
+    assert Dstar.Utility.StreamRegistry.owner({{:dstar_demo, :presence}, raw_tab}) == :error
 
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
-             {{:dstar_demo, :presence}, presence_tab}
-           ) == []
+    assert Dstar.Utility.StreamRegistry.owner({{:dstar_demo, :presence}, presence_tab}) == :error
 
     # The beacon still answers, it just has no stream to notify.
     leave_conn =
@@ -219,10 +207,9 @@ defmodule DstarDemoWeb.PresencePageTest do
 
   @tag timeout: 5_000
   test "a takeover by a newer stream halts the old one and runs handle_disconnect", %{conn: conn} do
-    # dstar 0.1.4 halts the library loop on the takeover signal itself, then
-    # calls handle_disconnect/1. This drives the real path — a second claimer
-    # on the same key — rather than seeding the mailbox, which 0.1.4 drains as
-    # a stale signal from before registration.
+    # Dstar halts the library loop on the takeover signal, then calls
+    # handle_disconnect/1. This drives the real path — a second claimant on the
+    # same key — rather than seeding the mailbox with a stale replacement.
     Phoenix.PubSub.subscribe(DstarDemo.PubSub, "presence:lobby")
 
     tab_id = "presence-takeover-tab"
@@ -241,14 +228,14 @@ defmodule DstarDemoWeb.PresencePageTest do
     end)
 
     assert_presence_diff(:joins, tab_id)
-    assert [{_pid, "takeover-instance"}] = Registry.lookup(Dstar.Utility.StreamRegistry, key)
+    assert {:ok, _old_pid, _claim} = Dstar.Utility.StreamRegistry.owner(key)
 
     # Exactly what a second stream's Dstar.start_stream does.
     assert :ok = Dstar.Utility.StreamRegistry.replace_and_register(key)
 
     # The old stream halted, so handle_disconnect/1 untracked its presence.
     assert_presence_diff(:leaves, tab_id)
-    assert [{pid, _}] = Registry.lookup(Dstar.Utility.StreamRegistry, key)
+    assert {:ok, pid, _claim} = Dstar.Utility.StreamRegistry.owner(key)
     assert pid == self()
   after
     Dstar.Utility.StreamRegistry.unregister_self()
@@ -281,10 +268,8 @@ defmodule DstarDemoWeb.PresencePageTest do
                Dstar.Page.Plug.init({:stream, DstarDemoWeb.PresencePage})
              )
 
-    assert Registry.lookup(
-             Dstar.Utility.StreamRegistry,
-             {{:dstar_demo, :presence}, tab_id}
-           ) == []
+    key = {{:dstar_demo, :presence}, tab_id}
+    assert Dstar.Utility.StreamRegistry.owner(key) == :error
 
     refute DstarDemoWeb.Presence.list("presence:lobby") |> Map.has_key?(tab_id)
 
@@ -316,11 +301,8 @@ defmodule DstarDemoWeb.PresencePageTest do
 
     assert_presence_diff(:joins, tab_id)
 
-    assert [{pid, "leave-instance"}] =
-             Registry.lookup(
-               Dstar.Utility.StreamRegistry,
-               {{:dstar_demo, :presence}, tab_id}
-             )
+    key = {{:dstar_demo, :presence}, tab_id}
+    assert {:ok, pid, _claim} = Dstar.Utility.StreamRegistry.owner(key)
 
     leave_conn =
       post_form(conn, ~p"/presence/_event/leave", %{
@@ -364,11 +346,8 @@ defmodule DstarDemoWeb.PresencePageTest do
 
     assert_presence_diff(:joins, tab_id)
 
-    assert [{old_pid, ^old_instance}] =
-             Registry.lookup(
-               Dstar.Utility.StreamRegistry,
-               {{:dstar_demo, :presence}, tab_id}
-             )
+    key = {{:dstar_demo, :presence}, tab_id}
+    assert {:ok, old_pid, _claim} = Dstar.Utility.StreamRegistry.owner(key)
 
     new_task =
       Task.Supervisor.async_nolink(supervisor, fn ->
@@ -381,17 +360,12 @@ defmodule DstarDemoWeb.PresencePageTest do
       end)
 
     try do
-      assert_receive {:DOWN, old_ref, :process, ^old_pid, :replaced}, 1_000
+      assert_receive {:DOWN, old_ref, :process, ^old_pid, {:replaced, _claim}}, 1_000
       assert old_ref == old_task.ref
 
       assert_presence_diff(:joins, tab_id)
 
-      assert [{new_pid, ^new_instance}] =
-               Registry.lookup(
-                 Dstar.Utility.StreamRegistry,
-                 {{:dstar_demo, :presence}, tab_id}
-               )
-
+      assert {:ok, new_pid, _claim} = Dstar.Utility.StreamRegistry.owner(key)
       assert new_pid == new_task.pid
       new_ref = new_task.ref
 
@@ -403,12 +377,6 @@ defmodule DstarDemoWeb.PresencePageTest do
 
       assert leave_conn.state == :chunked
       refute_receive {:DOWN, ^new_ref, :process, ^new_pid, :normal}, 100
-
-      assert [{^new_pid, ^new_instance}] =
-               Registry.lookup(
-                 Dstar.Utility.StreamRegistry,
-                 {{:dstar_demo, :presence}, tab_id}
-               )
     after
       Task.shutdown(new_task, :brutal_kill)
     end

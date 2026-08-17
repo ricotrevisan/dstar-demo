@@ -39,12 +39,12 @@ config :dstar_demo, DstarDemoWeb.Endpoint,
     web_console_logger: true,
     patterns: [
       # Static assets, except user uploads
-      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$"E,
+      ~r"priv/static/(?!uploads/).*\.(js|css|png|jpeg|jpg|gif|svg)$",
       # Gettext translations
-      ~r"priv/gettext/.*\.po$"E,
+      ~r"priv/gettext/.*\.po$",
       # Router, Dstar pages, controllers, and components
-      ~r"lib/dstar_demo_web/router\.ex$"E,
-      ~r"lib/dstar_demo_web/(controllers|live|components|pages)/.*\.(ex|heex)$"E
+      ~r"lib/dstar_demo_web/router\.ex$",
+      ~r"lib/dstar_demo_web/(controllers|live|components|pages)/.*\.(ex|heex)$"
     ]
   ]
 
