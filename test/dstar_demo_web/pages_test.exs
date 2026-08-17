@@ -13,22 +13,43 @@ defmodule DstarDemoWeb.PagesTest do
     # signal the StreamRegistry reads — HTML lowercases attribute names,
     # so data-signals:tabId would silently create a "tabid" signal.
     assert response =~ ~s[data-signals:tab-id=]
-    assert response =~ ~s[href="/commands"]
-    assert response =~ ~s[href="/search"]
-    assert response =~ ~s[href="/streaming"]
-    assert response =~ ~s[href="/patch-lab"]
-    assert response =~ ~s[href="/components"]
-    assert response =~ ~s[href="/signals"]
-    assert response =~ ~s[href="/scripts"]
+    showcase = response |> LazyHTML.from_document() |> LazyHTML.query("#showcase-map")
 
-    # Every demo is reachable from the home page, including presence, which the
-    # original test omitted.
-    assert response =~ ~s[href="/presence"]
+    for path <- ~w(/collections /streaming /patch-lab /signals /presence) do
+      link = LazyHTML.query(showcase, "a[href='#{path}']")
+      assert LazyHTML.attribute(link, "href") == [path]
+    end
+
+    examples_link = LazyHTML.query(showcase, "a[href='/examples']")
+    assert LazyHTML.attribute(examples_link, "href") == ["/examples"]
+
+    for path <- ~w(/commands /search /components /scripts /auth) do
+      link = LazyHTML.query(showcase, "a[href='#{path}']")
+      assert LazyHTML.attribute(link, "href") == []
+    end
 
     # Restyled onto theme tokens — no leftover hardcoded dark utilities.
     refute response =~ "bg-zinc-950"
     refute response =~ "text-zinc-100"
     refute response =~ "bg-emerald-300"
+  end
+
+  test "GET /examples", %{conn: conn} do
+    response = conn |> get(~p"/examples") |> html_response(200)
+    document = LazyHTML.from_document(response)
+    reference = LazyHTML.query(document, "#reference-map")
+
+    assert response =~ "Examples / Reference"
+
+    for path <- ~w(/commands /search /components /scripts /auth) do
+      link = LazyHTML.query(reference, "a[href='#{path}']")
+      assert LazyHTML.attribute(link, "href") == [path]
+    end
+
+    for path <- ~w(/collections /streaming /patch-lab /signals /presence) do
+      link = LazyHTML.query(reference, "a[href='#{path}']")
+      assert LazyHTML.attribute(link, "href") == []
+    end
   end
 
   test "GET /commands", %{conn: conn} do
@@ -206,6 +227,7 @@ defmodule DstarDemoWeb.PagesTest do
         |> post_event(~p"/patch-lab", mode, %{"patch_count" => 0})
 
       body = sse_body(event_conn)
+      assert body =~ "useViewTransition true"
       if mode_line, do: assert(body =~ mode_line, "#{mode}: expected #{mode_line} in SSE body")
       assert body =~ "selector #{selector}", "#{mode}: expected selector #{selector}"
       if marker, do: assert(body =~ marker)
@@ -302,6 +324,17 @@ defmodule DstarDemoWeb.PagesTest do
     assert sse_body(conn) =~ "No form data has reached the server yet"
   end
 
+  test "signals page projects bound state locally before a server event", %{conn: conn} do
+    response = conn |> get(~p"/signals") |> html_response(200)
+    preview = response |> LazyHTML.from_document() |> LazyHTML.query("#signals-local-preview")
+
+    assert LazyHTML.text(preview) =~ "No HTTP request has happened yet."
+
+    assert LazyHTML.attribute(LazyHTML.query(preview, "[data-text*=scope]"), "data-text") == [
+             "$scope + ' · ' + $filter"
+           ]
+  end
+
   test "signals read event snapshots incoming signals into the inspector", %{conn: conn} do
     conn = post_event(conn, ~p"/signals", "read", %{"scope" => "beta", "server_tick" => 7})
 
@@ -374,8 +407,11 @@ defmodule DstarDemoWeb.PagesTest do
     for {path, _marker} <- demo_pages() ++ [{~p"/presence", nil}] do
       response = conn |> recycle() |> get(path) |> html_response(200)
 
-      # Persistent sidebar, listing every demo, on every page.
+      # Persistent sidebar, grouped into the curated showcase and reference pages.
       assert response =~ ~s[aria-label="Demos"]
+      assert response =~ "Showcase"
+      assert response =~ "Examples / Reference"
+      assert response =~ ~s[href="/examples"]
       assert response =~ ~s[href="/commands"]
       assert response =~ ~s[href="/presence"]
 
@@ -470,6 +506,7 @@ defmodule DstarDemoWeb.PagesTest do
           {~p"/components", "ComponentStage is a Dstar.Component: UI plus handle_event/3."},
           {~p"/signals", "handle_event/3 receives the request signals already read."},
           {~p"/scripts", "execute_script/3 appends a script tag through a patch."},
+          {~p"/auth", "Every Dstar request crosses the same Phoenix authentication pipeline."},
           {~p"/presence", "Phoenix Presence tracks each browser tab as a visitor."}
         ] do
       response = conn |> recycle() |> get(path) |> html_response(200)
@@ -486,15 +523,34 @@ defmodule DstarDemoWeb.PagesTest do
     end
   end
 
+  test "auth page explains the single HTTP authentication gate and authorization seam", %{
+    conn: conn
+  } do
+    response = conn |> get(~p"/auth") |> html_response(200)
+
+    assert response =~ "Every Dstar request crosses the same Phoenix authentication pipeline."
+    assert response =~ "GET /settings"
+    assert response =~ "POST /settings/_event/:event"
+    assert response =~ "POST /settings"
+    assert response =~ "POST /ds/:module/:event"
+    assert response =~ "pipe_through"
+    assert response =~ "require_authenticated_user"
+    assert response =~ "mount/2 runs only on GET"
+    assert response =~ "authorize/2"
+    assert response =~ "before SSE starts"
+    assert response =~ "on_mount"
+  end
+
   defp demo_pages do
     [
       {~p"/commands", "Form data validation"},
       {~p"/search", "Active search"},
-      {~p"/streaming", "Streaming dashboard"},
-      {~p"/patch-lab", "Patch lab"},
+      {~p"/streaming", "Progressive SSE workflow"},
+      {~p"/patch-lab", "morph lab"},
       {~p"/components", "Server-rendered components"},
-      {~p"/signals", "Signals lifecycle"},
-      {~p"/scripts", "Script helpers"}
+      {~p"/signals", "Signal-native UI"},
+      {~p"/scripts", "Script helpers"},
+      {~p"/auth", "One authentication flow"}
     ]
   end
 

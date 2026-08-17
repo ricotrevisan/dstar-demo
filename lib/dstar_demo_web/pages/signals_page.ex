@@ -20,8 +20,8 @@ defmodule DstarDemoWeb.SignalsPage do
     ~H"""
     <.demo_shell
       active="Signals"
-      title="Signals lifecycle"
-      summary="Inspect the signals handed to handle_event/3, patch server-owned values, and remove client signals while watching the current flow."
+      title="Signal-native UI"
+      summary="Edit reactive client state with no request, then choose when the server should read it, reconcile it, patch owned values, or remove a signal."
       signals={
         %{
           scope: @scope,
@@ -64,6 +64,37 @@ defmodule DstarDemoWeb.SignalsPage do
                   class="w-full rounded-md border border-base-300 bg-base-100 px-3 py-2.5 text-base-content transition focus:border-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                 />
               </label>
+            </div>
+
+            <div
+              id="signals-local-preview"
+              class="mt-5 border border-primary/35 bg-primary/10 p-4"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-base-content">Instant local projection</p>
+                  <p class="mt-1 text-xs text-base-content/60">
+                    These bindings update in the browser. No HTTP request has happened yet.
+                  </p>
+                </div>
+                <.pill label="client only" tone="good" />
+              </div>
+              <p
+                class="mt-4 font-mono text-sm font-semibold text-base-content"
+                data-text="$scope + ' · ' + $filter"
+              >
+                {@scope} · {@filter}
+              </p>
+              <p
+                class="mt-2 text-sm text-base-content/70"
+                data-show="$ephemeral"
+                data-text="'Draft: ' + $ephemeral"
+              >
+                Draft: {@ephemeral}
+              </p>
+              <p class="mt-2 text-sm text-base-content/50" data-show="!$ephemeral">
+                The ephemeral signal is absent. Patch or reload to restore client state.
+              </p>
             </div>
 
             <div class="mt-5 flex flex-wrap gap-2">
@@ -118,6 +149,7 @@ defmodule DstarDemoWeb.SignalsPage do
 
       <:how_it_works>
         <.key_points items={[
+          "Bindings and expressions react locally before any request reaches Phoenix.",
           "handle_event/3 receives the request signals already read.",
           "patch_signals/3 updates server-owned signals.",
           "remove_signals/3 clears selected client state.",

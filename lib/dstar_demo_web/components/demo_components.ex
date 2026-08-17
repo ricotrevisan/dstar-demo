@@ -13,15 +13,28 @@ defmodule DstarDemoWeb.DemoComponents do
     router: DstarDemoWeb.Router,
     statics: DstarDemoWeb.static_paths()
 
-  @demos [
-    {"Form Validation", "/commands", "hero-clipboard-document-check-micro"},
-    {"Active Search", "/search", "hero-magnifying-glass-micro"},
-    {"Streaming Dashboard", "/streaming", "hero-signal-micro"},
-    {"Patch Lab", "/patch-lab", "hero-squares-plus-micro"},
-    {"Components", "/components", "hero-cube-transparent-micro"},
-    {"Signals", "/signals", "hero-adjustments-horizontal-micro"},
-    {"Scripts", "/scripts", "hero-code-bracket-square-micro"},
-    {"Presence", "/presence", "hero-user-group-micro"}
+  @nav_groups [
+    %{
+      label: "Showcase",
+      items: [
+        {"Live Collections", "/collections", "hero-rectangle-stack-micro"},
+        {"Streaming", "/streaming", "hero-signal-micro"},
+        {"Patch Lab", "/patch-lab", "hero-squares-plus-micro"},
+        {"Signals", "/signals", "hero-adjustments-horizontal-micro"},
+        {"Presence", "/presence", "hero-user-group-micro"}
+      ]
+    },
+    %{
+      label: "Examples / Reference",
+      items: [
+        {"Examples / Reference", "/examples", "hero-book-open-micro"},
+        {"Form Validation", "/commands", "hero-clipboard-document-check-micro"},
+        {"Active Search", "/search", "hero-magnifying-glass-micro"},
+        {"Components", "/components", "hero-cube-transparent-micro"},
+        {"Scripts", "/scripts", "hero-code-bracket-square-micro"},
+        {"Auth Flow", "/auth", "hero-shield-check-micro"}
+      ]
+    }
   ]
 
   attr :active, :string, required: true
@@ -37,7 +50,7 @@ defmodule DstarDemoWeb.DemoComponents do
   def demo_shell(assigns) do
     assigns =
       assigns
-      |> assign(:demos, @demos)
+      |> assign(:nav_groups, @nav_groups)
       |> assign(:jump_links, jump_links(assigns))
 
     ~H"""
@@ -71,11 +84,11 @@ defmodule DstarDemoWeb.DemoComponents do
                   class="size-4 shrink-0 transition-transform group-open:rotate-180"
                 />
               </summary>
-              <.demo_nav demos={@demos} active={@active} />
+              <.demo_nav nav_groups={@nav_groups} active={@active} />
             </details>
 
             <div class="hidden lg:block">
-              <.demo_nav demos={@demos} active={@active} />
+              <.demo_nav nav_groups={@nav_groups} active={@active} />
             </div>
 
             <div class="mt-auto flex justify-center border-t border-base-300 px-5 py-4">
@@ -137,26 +150,31 @@ defmodule DstarDemoWeb.DemoComponents do
       else: base ++ [{"comparison", "LiveView comparison"}]
   end
 
-  attr :demos, :list, required: true
+  attr :nav_groups, :list, required: true
   attr :active, :string, required: true
 
   defp demo_nav(assigns) do
     ~H"""
     <nav class="flex flex-col pb-5 text-sm" aria-label="Demos">
-      <a
-        :for={{label, href, icon} <- @demos}
-        href={href}
-        aria-current={@active == label && "page"}
-        class={[
-          "flex items-center gap-2.5 border-l-2 px-5 py-2 transition",
-          @active == label && "border-primary font-medium text-base-content",
-          @active != label &&
-            "border-transparent text-base-content/60 hover:border-base-300 hover:text-base-content"
-        ]}
-      >
-        <.icon name={icon} class="size-4 shrink-0 opacity-70" />
-        <span>{label}</span>
-      </a>
+      <section :for={group <- @nav_groups} class="border-t border-base-300 pt-3 first:border-t-0">
+        <p class="px-5 pb-2 font-mono text-[11px] tracking-wide text-base-content/45 uppercase">
+          {group.label}
+        </p>
+        <a
+          :for={{label, href, icon} <- group.items}
+          href={href}
+          aria-current={@active == label && "page"}
+          class={[
+            "flex items-center gap-2.5 border-l-2 px-5 py-2 transition",
+            @active == label && "border-primary font-medium text-base-content",
+            @active != label &&
+              "border-transparent text-base-content/60 hover:border-base-300 hover:text-base-content"
+          ]}
+        >
+          <.icon name={icon} class="size-4 shrink-0 opacity-70" />
+          <span>{label}</span>
+        </a>
+      </section>
     </nav>
     """
   end

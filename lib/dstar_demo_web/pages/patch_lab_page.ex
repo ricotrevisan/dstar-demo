@@ -32,8 +32,8 @@ defmodule DstarDemoWeb.PatchLabPage do
     ~H"""
     <.demo_shell
       active="Patch Lab"
-      title="Patch lab"
-      summary="Each control sends a page event that uses a different Datastar patch mode. The target area makes insertion, replacement, and removal explicit."
+      title="Patch & morph lab"
+      summary="Watch the server name an exact selector and DOM operation while Datastar morphs, inserts, removes, and animates the result with browser View Transitions."
       signals={%{selected_mode: @selected_mode, hovered_mode: "", patch_count: @patch_count}}
     >
       <:demo>
@@ -105,6 +105,7 @@ defmodule DstarDemoWeb.PatchLabPage do
           "append and prepend add children to a list.",
           "before and after insert siblings around an anchor.",
           "remove deletes the selected element.",
+          "Browser View Transitions animate the server-directed DOM operation.",
           "The selector is fixed per mode; the header and the ringed node show which one is next."
         ]} />
 
@@ -166,7 +167,7 @@ defmodule DstarDemoWeb.PatchLabPage do
     conn
     |> patch_signals(%{patch_count: 0})
     |> patch(&patch_status/1, selected_mode: mode, patch_count: 0)
-    |> patch(&lab_stage/1, [], selector: "#lab-stage", mode: :outer)
+    |> patch(&lab_stage/1, [], selector: "#lab-stage", mode: :outer, use_view_transitions: true)
   end
 
   # Keeps the mode buttons' highlight in sync with the $selected_mode
@@ -307,37 +308,49 @@ defmodule DstarDemoWeb.PatchLabPage do
 
     case mode do
       "outer" ->
-        patch(conn, &lab_target/1, [count: count], selector: "#lab-target", mode: :outer)
+        patch(conn, &lab_target/1, [count: count],
+          selector: "#lab-target",
+          mode: :outer,
+          use_view_transitions: true
+        )
 
       "inner" ->
-        patch(conn, &inner_body/1, [count: count], selector: "#lab-target", mode: :inner)
+        patch(conn, &inner_body/1, [count: count],
+          selector: "#lab-target",
+          mode: :inner,
+          use_view_transitions: true
+        )
 
       "append" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#patch-list",
-          mode: :append
+          mode: :append,
+          use_view_transitions: true
         )
 
       "prepend" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#patch-list",
-          mode: :prepend
+          mode: :prepend,
+          use_view_transitions: true
         )
 
       "before" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#anchor-row",
-          mode: :before
+          mode: :before,
+          use_view_transitions: true
         )
 
       "after" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#anchor-row",
-          mode: :after
+          mode: :after,
+          use_view_transitions: true
         )
 
       "remove" ->
-        remove_elements(conn, "#removable-note")
+        remove_elements(conn, "#removable-note", use_view_transitions: true)
     end
   end
 

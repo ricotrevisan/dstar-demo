@@ -92,9 +92,9 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
 
     ~H"""
     <.demo_shell
-      active="Streaming Dashboard"
-      title="Streaming dashboard"
-      summary="A bounded SSE loop sends live metrics and activity patches. Starting it again in the same tab replaces the prior stream."
+      active="Streaming"
+      title="Progressive SSE workflow"
+      summary="One ordinary POST stays open long enough to deliver a sequence of signal and HTML patches, then completes without leaving a page process resident."
       signals={
         %{
           streamStatus: @streamStatus,
@@ -157,6 +157,7 @@ defmodule DstarDemoWeb.StreamingDashboardPage do
 
       <:how_it_works>
         <.key_points items={[
+          "One POST carries many progressive patches and then ends cleanly.",
           "connect/1 posts to the page path and opens the stream.",
           "stream_key/1 deduplicates by demo scope plus tabId.",
           "handle_info/2 receives ticks from the library-owned loop.",

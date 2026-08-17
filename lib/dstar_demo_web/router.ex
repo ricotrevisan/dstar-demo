@@ -21,6 +21,8 @@ defmodule DstarDemoWeb.Router do
     pipe_through :browser
 
     dstar("/", HomePage)
+    dstar("/examples", ExamplesPage)
+    dstar("/collections", LiveCollectionsPage)
     dstar("/commands", CommandsPage)
     dstar("/search", ActiveSearchPage)
     dstar("/streaming", StreamingDashboardPage)
@@ -28,6 +30,7 @@ defmodule DstarDemoWeb.Router do
     dstar("/components", ServerComponentsPage)
     dstar("/signals", SignalsPage)
     dstar("/scripts", ScriptsPage)
+    dstar("/auth", AuthFlowPage)
     dstar("/presence", PresencePage)
 
     dstar_components("/ds", [ComponentStage])

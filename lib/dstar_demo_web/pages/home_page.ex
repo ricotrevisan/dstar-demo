@@ -32,62 +32,54 @@ defmodule DstarDemoWeb.HomePage do
             href="https://data-star.dev"
             class="font-medium text-base-content underline decoration-base-content/30 underline-offset-2 transition hover:decoration-primary"
           >Datastar</a>, a hypermedia framework: the browser sends signals, the server
-          answers with HTML patches over SSE, and no client framework is involved.
+          answers with HTML patches over SSE, and no client-side component or virtual-DOM
+          application is required.
         </p>
         <p class="mt-4 max-w-[68ch] text-base leading-7 text-base-content/70">
-          Eight focused Dstar.Page modules for commands, signals, element patches, streaming,
-          components, and presence — each page is one module and one router line, shown beside
-          how Phoenix LiveView would solve the same problem.
+          The showcase focuses on interactions that make Datastar's model visible: client signals,
+          progressive SSE responses, explicit DOM patches, live collections, and multi-tab presence.
+          Smaller application patterns live in <a
+            href={~p"/examples"}
+            class="font-medium text-base-content underline decoration-base-content/30 underline-offset-2 transition hover:decoration-primary"
+          >Examples / Reference</a>.
         </p>
 
-        <section id="map" class="mt-10 grid border-t border-l border-base-300 sm:grid-cols-2">
+        <section id="showcase-map" class="mt-10 grid border-t border-l border-base-300 sm:grid-cols-2">
           <.demo_tile
-            title="Form Validation"
-            href={~p"/commands"}
-            icon="hero-clipboard-document-check"
-            body="A native form submits fields with contentType: 'form' and patches feedback only."
+            title="Live Collections"
+            href={~p"/collections"}
+            icon="hero-rectangle-stack"
+            body="Each filtered tab reloads with its own signals after one tiny PubSub nudge."
           />
           <.demo_tile
-            title="Active Search"
-            href={~p"/search"}
-            icon="hero-magnifying-glass"
-            body="Typing sends signals and patches only the result panel."
-          />
-          <.demo_tile
-            title="Streaming Dashboard"
+            title="Progressive SSE"
             href={~p"/streaming"}
             icon="hero-signal"
-            body="handle_connect and handle_info drive a bounded, deduplicated SSE stream."
+            body="One ordinary POST streams many patches, completes, and leaves no page process resident."
           />
           <.demo_tile
-            title="Patch Lab"
+            title="Patch & Morph Lab"
             href={~p"/patch-lab"}
             icon="hero-squares-plus"
-            body="outer, inner, append, prepend, before, after, and remove."
+            body="Watch explicit selectors, insertion modes, replacement, and removal change the DOM."
           />
           <.demo_tile
-            title="Server Components"
-            href={~p"/components"}
-            icon="hero-cube-transparent"
-            body="A Dstar.Component colocates shared UI with its event handlers."
-          />
-          <.demo_tile
-            title="Signals Inspector"
+            title="Signal-native UI"
             href={~p"/signals"}
             icon="hero-adjustments-horizontal"
-            body="patch_signals, remove_signals, and the signals handed to handle_event."
-          />
-          <.demo_tile
-            title="Script Helpers"
-            href={~p"/scripts"}
-            icon="hero-code-bracket-square"
-            body="execute_script, console_log, and a safe redirect target."
+            body="Client-owned reactive state meets server reconciliation and targeted HTML patches."
           />
           <.demo_tile
             title="Presence Room"
             href={~p"/presence"}
             icon="hero-user-group"
-            body="Multiple tabs join one room, update the roster, and send pings."
+            body="Multiple tabs join one room, update the roster, and send collaborative pings."
+          />
+          <.demo_tile
+            title="Examples / Reference"
+            href={~p"/examples"}
+            icon="hero-book-open"
+            body="Copyable patterns for forms, search, components, scripts, and authentication."
           />
         </section>
       </div>

@@ -262,17 +262,19 @@ defmodule DstarDemoWeb.Snippets do
       "before" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#anchor-row",
-          mode: :before
+          mode: :before,
+          use_view_transitions: true
         )
 
       "after" ->
         patch(conn, &patch_badge/1, [mode: mode, count: count],
           selector: "#anchor-row",
-          mode: :after
+          mode: :after,
+          use_view_transitions: true
         )
 
       "remove" ->
-        remove_elements(conn, "#removable-note")
+        remove_elements(conn, "#removable-note", use_view_transitions: true)
       """,
       liveview: """
       # Illustrative LiveView equivalent — not compiled or run.
@@ -528,6 +530,30 @@ defmodule DstarDemoWeb.Snippets do
       exist, and it is also why the other seven demos deliberately avoid them —
       the server-rendered patch flow stays easier to inspect without them.
       """
+    },
+    live_collections: %{
+      source: "#{@pages}/live_collections_page.ex",
+      wiring_language: "elixir",
+      wiring: """
+      def handle_connect(conn, _params) do
+        :ok = LiveCollections.subscribe()
+        nudge(conn, "work_items")
+      end
+
+      # ...
+
+      def handle_info({:live_collection_changed, :created, item}, conn) do
+        conn
+        |> nudge("work_items")
+        |> append_elements(arrival_row(%{item: item}), "#arrival-feed")
+      end
+
+      def handle_info({:live_collection_changed, :updated, _item}, conn) do
+        nudge(conn, "work_items")
+      end
+      """,
+      liveview: nil,
+      note: nil
     },
     presence: %{
       source: "#{@pages}/presence_page.ex",
