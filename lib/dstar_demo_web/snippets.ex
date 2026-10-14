@@ -13,6 +13,24 @@ defmodule DstarDemoWeb.Snippets do
   @pages "lib/dstar_demo_web/pages"
 
   @snippets %{
+    explained_lab: %{
+      source: "#{@pages}/explained_lab_page.ex",
+      wiring_language: "elixir",
+      wiring: """
+      def handle_connect(conn, _params) do
+        :ok = Server.subscribe()
+        patch(conn, &lab/1, lab: Server.get())
+      end
+      # ...
+      def handle_info(:chaos_lab_changed, conn), do: patch(conn, &lab/1, lab: Server.get())
+      # ...
+      def handle_event(conn, action, _signals) when action in @actions do
+        patch(conn, &lab/1, lab: Server.dispatch(action))
+      end
+      """,
+      liveview: nil,
+      note: nil
+    },
     explained_dx: %{
       source: "#{@pages}/explained_dx_page.ex",
       wiring_language: "elixir",

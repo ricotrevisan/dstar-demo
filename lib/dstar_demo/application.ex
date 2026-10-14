@@ -15,6 +15,7 @@ defmodule DstarDemo.Application do
       {Phoenix.PubSub, name: DstarDemo.PubSub},
       DstarDemoWeb.Presence,
       DstarDemo.Inbox,
+      DstarDemo.ChaosLab.Server,
       # Start a worker by calling: DstarDemo.Worker.start_link(arg)
       # {DstarDemo.Worker, arg},
       # Start to serve requests, typically the last entry
