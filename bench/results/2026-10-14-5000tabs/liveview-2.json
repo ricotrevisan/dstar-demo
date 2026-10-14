@@ -1,0 +1,79 @@
+{
+  "env": {
+    "cpu": "AMD EPYC-Genoa Processor",
+    "os": "Linux 6.12.105+deb13-amd64",
+    "run_at": "2026-10-14T11:22:00Z",
+    "deps": {
+      "bandit": "1.12.4",
+      "dstar": "0.2.0",
+      "phoenix": "1.8.11",
+      "phoenix_live_view": "1.1.33"
+    },
+    "elixir": "1.19.5",
+    "erts_version": "16.1",
+    "logical_processors": 8,
+    "otp_release": "28",
+    "schedulers": 8,
+    "system_architecture": "x86_64-pc-linux-gnu"
+  },
+  "open": {
+    "callbacks": {
+      "ds_connect": 0,
+      "ds_mount": 0,
+      "events": 0,
+      "lv_mount_http": 5000,
+      "lv_mount_socket": 5000
+    },
+    "server_cpu_ms": 8297,
+    "server_cpu_ms_per_tab": 1.66,
+    "html_bytes_per_tab": 5881,
+    "wall_ms": 2596.9
+  },
+  "idle": {
+    "baseline_memory_total_mb": 59.1,
+    "memory_bytes_per_tab": 24731.2,
+    "memory_total_mb": 177.0,
+    "open_connections": 5000,
+    "process_memory_bytes_per_tab": 12929.42,
+    "processes_per_tab": 2.0
+  },
+  "params": {
+    "tabs": 5000,
+    "clicks": 50,
+    "concurrency": 100,
+    "settle_ms": 2000
+  },
+  "model": "liveview",
+  "clicks": {
+    "all_tabs_updated_ms": {
+      "timeouts": 0,
+      "p50": 176.41,
+      "p95": 207.87
+    },
+    "clicker_response_bytes": 517,
+    "clicker_round_trip_ms": {
+      "p50": 143.24,
+      "p95": 198.37,
+      "p99": 205.68
+    },
+    "push_bytes_per_tab": 477.06,
+    "server_cpu_ms_per_click": 274.9
+  },
+  "deploy": {
+    "callbacks": {
+      "ds_connect": 0,
+      "ds_mount": 0,
+      "events": 0,
+      "lv_mount_http": 0,
+      "lv_mount_socket": 5000
+    },
+    "tabs": 5000,
+    "dropped": 5000,
+    "reconnected": 5000,
+    "all_back_ms": 2072.96,
+    "reconnect_p50_ms": 1812.77,
+    "server_cpu_ms": 6416,
+    "server_cpu_ms_per_tab": 1.28,
+    "memory_bytes_per_tab_after": 27586.77
+  }
+}

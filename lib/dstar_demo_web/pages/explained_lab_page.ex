@@ -46,7 +46,11 @@ defmodule DstarDemoWeb.ExplainedLabPage do
 
   @impl Dstar.Page
   def render(assigns) do
-    assigns = Map.put(assigns, :snippet, DstarDemoWeb.Snippets.fetch!(:explained_lab))
+    assigns =
+      Map.merge(assigns, %{
+        snippet: DstarDemoWeb.Snippets.fetch!(:explained_lab),
+        bench: DstarDemo.BenchResults.all()
+      })
 
     ~H"""
     <Layouts.flash_group flash={@flash} />
@@ -108,6 +112,12 @@ defmodule DstarDemoWeb.ExplainedLabPage do
           A LiveView process updates its copy, and a Dstar stream re-reads the truth.
         </.para>
       </section>
+
+      <.measured :if={@bench != []} runs={@bench}>
+        The counters above say <em>what</em> runs. This benchmark measures what it costs a
+        server: the same inbox built both ways, thousands of simulated tabs speaking the real
+        LiveView and Datastar protocols, and the server's numbers read from inside its own VM.
+      </.measured>
 
       <section class="mx-auto mt-20 max-w-[860px]">
         <.section_heading id="made-of">This lab is a Dstar page</.section_heading>
@@ -323,6 +333,154 @@ defmodule DstarDemoWeb.ExplainedLabPage do
     </button>
     """
   end
+
+  # ── Measured ──────────────────────────────────────────────────────────
+
+  @bench_models [
+    {"liveview", "LiveView", "neutral"},
+    {"dstar", "Dstar, with stream", "primary"},
+    {"dstar_nostream", "Dstar, no stream", "primary"}
+  ]
+
+  # {label in summary.json, unit} — lower is better for every row.
+  @bench_rows [
+    {"Server memory per open tab", :kb},
+    {"Server CPU per tab opened", :ms},
+    {"Round trip for the clicking tab, p50", :ms},
+    {"Until every open tab is updated, p50", :ms},
+    {"Bytes pushed to each other tab", :bytes},
+    {"Server CPU per click, fan-out included", :ms},
+    {"Until every tab is back", :ms},
+    {"Server CPU for the reconnect storm", :ms}
+  ]
+
+  attr :runs, :list, required: true
+  slot :inner_block, required: true
+
+  defp measured(assigns) do
+    assigns =
+      Map.merge(assigns, %{
+        models: @bench_models,
+        rows: @bench_rows,
+        first: hd(assigns.runs)["params"]["tabs"]
+      })
+
+    ~H"""
+    <section
+      id="measured"
+      class="mx-auto mt-20 max-w-[960px]"
+      data-signals={Jason.encode!(%{benchTabs: to_string(@first)})}
+    >
+      <div class="max-w-[68ch]">
+        <.section_heading>Counted above. Measured here.</.section_heading>
+        <.para>{render_slot(@inner_block)}</.para>
+      </div>
+
+      <div
+        :if={length(@runs) > 1}
+        class="mt-6 flex border-b border-base-300"
+        role="tablist"
+        aria-label="Open tabs"
+      >
+        <.tab_button
+          :for={run <- @runs}
+          signal="benchTabs"
+          key={to_string(run["params"]["tabs"])}
+          label={"#{run["params"]["tabs"]} open tabs"}
+        />
+      </div>
+
+      <div
+        :for={run <- @runs}
+        id={"measured-#{run["params"]["tabs"]}"}
+        class="mt-5 overflow-x-auto"
+        style={run["params"]["tabs"] != @first && "display: none"}
+        data-show={"$benchTabs == '#{run["params"]["tabs"]}'"}
+      >
+        <table class="w-full min-w-[640px] border border-base-300 text-left text-sm">
+          <thead class="bg-base-200 text-xs">
+            <tr>
+              <th class="px-4 py-2.5 font-medium text-base-content/70">
+                {run["params"]["tabs"]} tabs · median of {run["repeats"]} runs
+              </th>
+              <th :for={{_key, label, tone} <- @models} class="px-4 py-2.5 text-right font-semibold">
+                <span class="inline-flex items-center gap-2"><.swatch tone={tone} /> {label}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-base-300">
+            <tr :for={{row, unit} <- @rows}>
+              <th class="px-4 py-2.5 font-medium text-base-content/75">{row}</th>
+              <td
+                :for={{key, _label, _tone} <- @models}
+                class={[
+                  "px-4 py-2.5 text-right font-mono tabular-nums",
+                  best?(run, key, row) && "font-semibold text-base-content",
+                  !best?(run, key, row) && "text-base-content/70"
+                ]}
+              >
+                {bench_value(run["models"][key][row], unit)}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="mt-3 text-xs leading-5 text-base-content/60">
+          {run["env"]["cpu"]}, {run["env"]["logical_processors"]} cores · OTP {run["env"][
+            "otp_release"
+          ]} · Phoenix {run["env"]["deps"]["phoenix"]}, LiveView {run["env"]["deps"][
+            "phoenix_live_view"
+          ]}, Bandit {run["env"]["deps"]["bandit"]} · server and load generator on one machine over loopback · run {run[
+            "env"
+          ]["run_at"]}
+        </p>
+      </div>
+
+      <div class="mt-8 grid border-t border-l border-base-300 md:grid-cols-2">
+        <.verdict
+          title="What the measurements say"
+          tone="primary"
+          items={[
+            "**Opening a page is cheaper with Dstar.** mount runs once instead of twice, so the server spends roughly 35–45% less CPU per tab.",
+            "**A deploy is cheaper with Dstar.** Streams reconnect without remounting: about half the server CPU, and every tab is back sooner.",
+            "**A page without a stream costs nothing to keep open.** No process and no memory: only the clicks cost anything."
+          ]}
+        />
+        <.verdict
+          title="Where LiveView wins"
+          tone="neutral"
+          items={[
+            "**Fanning one update out to every tab.** LiveView sends a diff; each Dstar stream renders HTML. LiveView uses 11–20% less CPU and sends about 16% fewer bytes per tab.",
+            "**Holding a live tab open costs the same.** About 24 KB per tab either way. The open connection is the cost, not LiveView's copy, which streams keep small."
+          ]}
+        />
+      </div>
+
+      <.para>
+        So use a stream only where a tab really needs live updates. The rest of the page can be
+        plain requests. Reproduce it or run it on your own hardware:
+        <.xp_link href="https://github.com/ricotrevisan/dstar-demo/tree/main/bench">
+          bench/README.md
+        </.xp_link>
+      </.para>
+    </section>
+    """
+  end
+
+  # Bold the lower of LiveView and Dstar-with-stream, the like-for-like pair.
+  defp best?(run, key, row) when key in ["liveview", "dstar"] do
+    a = run["models"]["liveview"][row]
+    b = run["models"]["dstar"][row]
+    v = run["models"][key][row]
+    is_number(a) and is_number(b) and v == min(a, b)
+  end
+
+  defp best?(_run, _key, _row), do: false
+
+  defp bench_value(nil, _unit), do: "–"
+  defp bench_value(v, :kb) when v < 0, do: "≈ 0 KB"
+  defp bench_value(v, :kb), do: "#{Float.round(v / 1024, 1)} KB"
+  defp bench_value(v, :ms), do: "#{Float.round(v * 1.0, 2)} ms"
+  defp bench_value(v, :bytes), do: "#{round(v)} B"
 
   attr :term, :string, required: true
   slot :inner_block, required: true

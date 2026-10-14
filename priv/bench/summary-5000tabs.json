@@ -1,0 +1,82 @@
+{
+  "env": {
+    "cpu": "AMD EPYC-Genoa Processor",
+    "deps": {
+      "bandit": "1.12.4",
+      "dstar": "0.2.0",
+      "phoenix": "1.8.11",
+      "phoenix_live_view": "1.1.33"
+    },
+    "elixir": "1.19.5",
+    "erts_version": "16.1",
+    "logical_processors": 8,
+    "os": "Linux 6.12.105+deb13-amd64",
+    "otp_release": "28",
+    "run_at": "2026-10-14T11:20:33Z",
+    "schedulers": 8,
+    "system_architecture": "x86_64-pc-linux-gnu"
+  },
+  "params": {
+    "clicks": 50,
+    "concurrency": 100,
+    "settle_ms": 2000,
+    "tabs": 5000
+  },
+  "repeats": 3,
+  "models": {
+    "dstar": {
+      "Bytes back to the clicking tab": 569,
+      "Bytes pushed to each other tab": 569.49,
+      "Connections dropped": 5000,
+      "HTML per page load": 7207,
+      "Round trip for the clicking tab, p50": 159.34,
+      "Round trip for the clicking tab, p95": 214.23,
+      "Server CPU for the reconnect storm": 3964,
+      "Server CPU per click, fan-out included": 327.5,
+      "Server CPU per tab opened": 1.04,
+      "Server memory per open tab": 25222.39,
+      "Server processes per open tab": 1.0,
+      "Until every open tab is updated, p50": 200.59,
+      "Until every open tab is updated, p95": 230.86,
+      "Until every tab is back": 1634.77,
+      "handle_connect runs during the storm": 5000,
+      "mount runs during the storm": 0
+    },
+    "dstar_nostream": {
+      "Bytes back to the clicking tab": 569,
+      "Bytes pushed to each other tab": null,
+      "Connections dropped": 0,
+      "HTML per page load": 7207,
+      "Round trip for the clicking tab, p50": 0.72,
+      "Round trip for the clicking tab, p95": 1.22,
+      "Server CPU for the reconnect storm": 6,
+      "Server CPU per click, fan-out included": 1.42,
+      "Server CPU per tab opened": 0.45,
+      "Server memory per open tab": 65.89,
+      "Server processes per open tab": 0.0,
+      "Until every open tab is updated, p50": null,
+      "Until every open tab is updated, p95": null,
+      "Until every tab is back": null,
+      "handle_connect runs during the storm": 0,
+      "mount runs during the storm": 0
+    },
+    "liveview": {
+      "Bytes back to the clicking tab": 517,
+      "Bytes pushed to each other tab": 477.06,
+      "Connections dropped": 5000,
+      "HTML per page load": 5881,
+      "Round trip for the clicking tab, p50": 150.82,
+      "Round trip for the clicking tab, p95": 198.37,
+      "Server CPU for the reconnect storm": 7021,
+      "Server CPU per click, fan-out included": 291.24,
+      "Server CPU per tab opened": 1.64,
+      "Server memory per open tab": 24791.5,
+      "Server processes per open tab": 2.0,
+      "Until every open tab is updated, p50": 182.74,
+      "Until every open tab is updated, p95": 214.44,
+      "Until every tab is back": 2530.32,
+      "handle_connect runs during the storm": 0,
+      "mount runs during the storm": 5000
+    }
+  }
+}
