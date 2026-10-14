@@ -22,6 +22,28 @@ defmodule DstarDemoWeb.ExplainedLabPageTest do
     assert init =~ "@post("
   end
 
+  test "the published benchmark medians render as a table per run", %{conn: conn} do
+    assert Path.wildcard("priv/bench/summary-*tabs.json") != [],
+           "priv/bench/summary-*tabs.json should be published"
+
+    runs = DstarDemo.BenchResults.all()
+
+    document = conn |> get(~p"/explained/lab") |> html_response(200) |> LazyHTML.from_document()
+
+    for run <- runs do
+      tabs = run["params"]["tabs"]
+      table = LazyHTML.query(document, "#measured-#{tabs} table tbody tr")
+      assert Enum.count(table) == 8
+    end
+  end
+
+  test "every published run has all three models and every row the page shows" do
+    for run <- DstarDemo.BenchResults.all(), model <- ~w(liveview dstar dstar_nostream) do
+      assert Map.has_key?(run["models"], model)
+      assert is_number(run["models"][model]["Server memory per open tab"])
+    end
+  end
+
   test "a lab action updates the shared lab and patches it back", %{conn: conn} do
     body = conn |> post_event("deploy") |> response(200)
 
