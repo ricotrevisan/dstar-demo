@@ -461,6 +461,7 @@ defmodule DstarDemoWeb.ExplainedDxPage do
         </div>
         <.para>
           Both live happily in one Phoenix app, so you can choose per route.
+          <.xp_link href={~p"/explained/lab"}>Now go break them</.xp_link>
         </.para>
       </section>
     </.article_shell>

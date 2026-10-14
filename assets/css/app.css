@@ -155,3 +155,23 @@ html {
 @media (prefers-reduced-motion: reduce) {
   .dx-wire-hot { animation: none; }
 }
+
+/* ── /explained/lab: tab pings ───────────────────────────────────────────
+   A morph keeps the element, so re-adding the same class would not restart
+   the animation. The server alternates two identical keyframes by sequence
+   parity instead. */
+.lab-ping-0 { animation: lab-ping-0 900ms ease-out; }
+.lab-ping-1 { animation: lab-ping-1 900ms ease-out; }
+@keyframes lab-ping-0 {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary) 70%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+@keyframes lab-ping-1 {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary) 70%, transparent); }
+  100% { box-shadow: 0 0 0 8px transparent; }
+}
+.lab-log-enter { animation: dx-enter 600ms ease-out both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lab-ping-0, .lab-ping-1, .lab-log-enter { animation: none; }
+}
