@@ -22,6 +22,7 @@ defmodule DstarDemoWeb.Router do
 
     dstar("/", HomePage)
     dstar("/explained/dx", ExplainedDxPage)
+    dstar("/explained/lab", ExplainedLabPage)
     dstar("/examples", ExamplesPage)
     dstar("/collections", LiveCollectionsPage)
     dstar("/commands", CommandsPage)
