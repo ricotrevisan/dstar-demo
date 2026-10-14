@@ -44,6 +44,25 @@ defmodule DstarDemoWeb.HomePage do
           >Examples / Reference</a>.
         </p>
 
+        <a
+          id="explainer-link"
+          href={~p"/explained/dx"}
+          class="group mt-8 flex items-center justify-between gap-4 border border-primary/40 bg-primary/10 px-5 py-4 transition hover:border-primary"
+        >
+          <span>
+            <span class="block text-base font-semibold tracking-tight">
+              New here? Watch an inbox grow up in LiveView and Dstar
+            </span>
+            <span class="mt-1 block text-sm text-base-content/70">
+              Follow the arrows: login, a layout sidebar, live tabs and a deploy, in both models.
+            </span>
+          </span>
+          <.icon
+            name="hero-arrow-right"
+            class="size-5 shrink-0 transition group-hover:translate-x-0.5"
+          />
+        </a>
+
         <section id="showcase-map" class="mt-10 grid border-t border-l border-base-300 sm:grid-cols-2">
           <.demo_tile
             title="Live Collections"

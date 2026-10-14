@@ -13,6 +13,31 @@ defmodule DstarDemoWeb.Snippets do
   @pages "lib/dstar_demo_web/pages"
 
   @snippets %{
+    explained_dx: %{
+      source: "#{@pages}/explained_dx_page.ex",
+      wiring_language: "elixir",
+      wiring: """
+      def handle_event(conn, "read:" <> id, _signals) do
+        with {id, ""} <- Integer.parse(id), do: Inbox.mark_read(id)
+        patch_inbox(conn)
+      end
+      # ...
+      def handle_connect(conn, _params) do
+        :ok = Inbox.subscribe()
+        patch_inbox(conn)
+      end
+      # ...
+      def handle_info(:inbox_changed, conn), do: patch_inbox(conn)
+      # ...
+      defp patch_inbox(conn) do
+        conn
+        |> patch(&inbox_sidebar/1, unread: Inbox.unread_count())
+        |> patch(&inbox_list/1, messages: Inbox.list())
+      end
+      """,
+      liveview: nil,
+      note: nil
+    },
     commands: %{
       source: "#{@pages}/commands_page.ex",
       wiring_language: "elixir",
