@@ -148,31 +148,38 @@ defmodule DstarDemoWeb.ExplainerComponents do
   end
 
   @doc """
-  One scroll step. Crossing half its height sets `signal` to `n`, which is
-  what drives the sticky diagram beside it.
+  One scroll step. When half of its text is in view, `signal` becomes `n`,
+  which is what drives the sticky diagram beside it.
+
+  `:extra` renders below the text but isn't measured: Datastar's threshold
+  is a share of the element, so a step made taller than two screens by
+  unfolded code would otherwise never become the current stage.
   """
   attr :n, :integer, required: true
   attr :title, :string, required: true
   attr :signal, :string, default: "step"
   attr :id_prefix, :string, default: "xp-step"
   slot :inner_block, required: true
+  slot :extra
 
   def step(assigns) do
     ~H"""
     <div
       id={"#{@id_prefix}-#{@n}"}
       class="flex min-h-[80vh] items-center py-10 first:min-h-[60vh] last:min-h-[70vh]"
-      data-on-intersect__half={"$#{@signal} = #{@n}"}
     >
       <div
-        class="border-l-2 border-base-300 pl-5 transition duration-300"
+        class="w-full min-w-0 border-l-2 border-base-300 pl-5 transition duration-300"
         data-class={"{'!border-primary': $#{@signal} == #{@n}, 'opacity-50': $#{@signal} != #{@n}}"}
       >
-        <p class="font-mono text-xs text-base-content/60">{String.pad_leading("#{@n}", 2, "0")}</p>
-        <h3 class="mt-1 text-xl font-semibold tracking-tight">{@title}</h3>
-        <div class="mt-3 space-y-4 text-base leading-7 text-base-content/80 [&_code]:font-mono [&_code]:text-sm">
-          {render_slot(@inner_block)}
+        <div data-on-intersect__half={"$#{@signal} = #{@n}"}>
+          <p class="font-mono text-xs text-base-content/60">{String.pad_leading("#{@n}", 2, "0")}</p>
+          <h3 class="mt-1 text-xl font-semibold tracking-tight">{@title}</h3>
+          <div class="mt-3 space-y-4 text-base leading-7 text-base-content/80 [&_code]:font-mono [&_code]:text-sm">
+            {render_slot(@inner_block)}
+          </div>
         </div>
+        <div :if={@extra != []} class="mt-4 space-y-4">{render_slot(@extra)}</div>
       </div>
     </div>
     """

@@ -18,307 +18,14 @@ defmodule DstarDemoWeb.HomePage do
 
   alias DstarDemo.ChaosLab.Server
   alias DstarDemo.Inbox
+  alias DstarDemoWeb.HomeCode
 
   @stages [
     {1, "A page with buttons"},
-    {2, "Log in, please"},
+    {2, "Your plugs, twice"},
     {3, "The sidebar wants to know"},
     {4, "Other tabs want to know"},
     {5, "Then you deploy"}
-  ]
-
-  # ── The whole feature, as code ─────────────────────────────────────────
-  # Files that differ between the two apps. phx.gen.auth's user_auth.ex and
-  # the Inbox context are the same in both, so neither side counts them.
-
-  @lv_files [
-    {"router.ex",
-     ~S'''
-     scope "/", MyAppWeb do
-       pipe_through [:browser, :require_authenticated_user]
-
-       live_session :require_authenticated_user,
-         on_mount: [{MyAppWeb.UserAuth, :require_authenticated}, MyAppWeb.Unread] do
-         live "/inbox", InboxLive
-         # ...every page with the sidebar lives in this live_session
-       end
-     end
-     '''},
-    {"unread.ex",
-     ~S'''
-     defmodule MyAppWeb.Unread do
-       @moduledoc "Keeps the layout's unread badge fresh on every LiveView in the live_session."
-       import Phoenix.Component, only: [assign: 3]
-       import Phoenix.LiveView, only: [attach_hook: 4, connected?: 1]
-
-       alias MyApp.Inbox
-
-       def on_mount(:default, _params, _session, socket) do
-         scope = socket.assigns.current_scope
-         if connected?(socket), do: Inbox.subscribe(scope)
-
-         {:cont,
-          socket
-          |> assign(:unread, Inbox.unread_count(scope))
-          |> attach_hook(:unread, :handle_info, &handle_info/2)}
-       end
-
-       # :cont hands the message on, so the page can update its own rows.
-       # Every LiveView in the live_session receives inbox messages.
-       defp handle_info({:inbox_changed, _message}, socket) do
-         {:cont, assign(socket, :unread, Inbox.unread_count(socket.assigns.current_scope))}
-       end
-
-       defp handle_info(_message, socket), do: {:cont, socket}
-     end
-     '''},
-    {"layouts.ex",
-     ~S'''
-     attr :flash, :map, required: true
-     attr :current_scope, :map, default: nil
-     attr :unread, :integer, default: 0
-     slot :inner_block, required: true
-
-     def app(assigns) do
-       ~H"""
-       <aside>
-         <.link navigate={~p"/inbox"}>Inbox <span>{@unread}</span></.link>
-       </aside>
-       <main>{render_slot(@inner_block)}</main>
-       <.flash_group flash={@flash} />
-       """
-     end
-     '''},
-    {"inbox_live.ex",
-     ~S'''
-     def mount(_params, _session, socket) do
-       {:ok, stream(socket, :messages, Inbox.list(socket.assigns.current_scope))}
-     end
-
-     # Every LiveView hands its layout the badge it was given by the hook.
-     def render(assigns) do
-       ~H"""
-       <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread}>
-         <ul id="messages" phx-update="stream">
-           <.message_row :for={{id, message} <- @streams.messages} id={id} message={message} />
-         </ul>
-       </Layouts.app>
-       """
-     end
-
-     # Inbox.mark_read!/2 broadcasts. The hook hears it and updates @unread.
-     def handle_event("read", %{"id" => id}, socket) do
-       message = Inbox.mark_read!(socket.assigns.current_scope, id)
-       {:noreply, stream_insert(socket, :messages, message)}
-     end
-
-     def handle_info({:inbox_changed, message}, socket) do
-       {:noreply, stream_insert(socket, :messages, message)}
-     end
-     '''}
-  ]
-
-  @ds_files [
-    {"router.ex",
-     ~S'''
-     pipeline :unread do
-       plug MyAppWeb.Unread
-     end
-
-     scope "/", MyAppWeb do
-       pipe_through [:browser, :require_authenticated_user, :unread]
-
-       dstar "/inbox", InboxPage
-     end
-     '''},
-    {"unread.ex",
-     ~S'''
-     defmodule MyAppWeb.Unread do
-       @moduledoc "Assigns the layout's unread badge. Runs on every request behind it."
-       import Plug.Conn
-
-       alias MyApp.Inbox
-
-       def init(opts), do: opts
-
-       def call(conn, _opts) do
-         assign(conn, :unread, Inbox.unread_count(conn.assigns.current_scope))
-       end
-     end
-     '''},
-    {"layouts.ex",
-     ~S'''
-     attr :flash, :map, required: true
-     attr :current_scope, :map, default: nil
-     attr :unread, :integer, default: 0
-     slot :inner_block, required: true
-
-     def app(assigns) do
-       ~H"""
-       <aside><.unread_badge unread={@unread} /></aside>
-       <main>{render_slot(@inner_block)}</main>
-       <.flash_group flash={@flash} />
-       """
-     end
-
-     attr :unread, :integer, required: true
-
-     def unread_badge(assigns) do
-       ~H"""
-       <a id="sidebar" href={~p"/inbox"}>Inbox <span>{@unread}</span></a>
-       """
-     end
-     '''},
-    {"inbox_page.ex",
-     ~S'''
-     def mount(conn, _params) do
-       assign(conn, :messages, Inbox.list(conn.assigns.current_scope))
-     end
-
-     def render(assigns) do
-       ~H"""
-       <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread}>
-         <ul id="messages" data-init={connect()}>
-           <.message_row :for={message <- @messages} message={message} />
-         </ul>
-       </Layouts.app>
-       """
-     end
-
-     # One response, two patches: the row, and the badge in the layout.
-     def handle_event(conn, "read:" <> id, _signals) do
-       message = Inbox.mark_read!(conn.assigns.current_scope, id)
-
-       conn
-       |> patch(&message_row/1, message: message)
-       |> patch_unread()
-     end
-
-     # Other tabs: connect() is a POST through the same plugs, then a stream.
-     def handle_connect(conn, _params) do
-       Inbox.subscribe(conn.assigns.current_scope)
-       conn
-     end
-
-     def handle_info({:inbox_changed, message}, conn) do
-       conn
-       |> patch(&message_row/1, message: message)
-       |> patch_unread()
-     end
-
-     # Nothing keeps the badge fresh for you: whatever changes it, patches it.
-     defp patch_unread(conn) do
-       patch(conn, &Layouts.unread_badge/1, unread: Inbox.unread_count(conn.assigns.current_scope))
-     end
-     '''}
-  ]
-
-  # ── A year later, as a pull request ───────────────────────────────────
-
-  @lv_pr [
-    {"lib/my_app_web/unread.ex", "the hook",
-     ~S'''
-        import Phoenix.Component, only: [assign: 3]
-     -  import Phoenix.LiveView, only: [attach_hook: 4, connected?: 1]
-     +  import Phoenix.LiveView, only: [attach_hook: 4, connected?: 1, put_flash: 3]
-      
-        # ...
-        defp handle_info({:inbox_changed, _message}, socket) do
-          {:cont, assign(socket, :unread, Inbox.unread_count(socket.assigns.current_scope))}
-        end
-      
-     +  defp handle_info({:new_message, message}, socket) do
-     +    {:cont,
-     +     socket
-     +     |> assign(:unread, Inbox.unread_count(socket.assigns.current_scope))
-     +     |> put_flash(:info, "New mail from #{message.from}: #{message.subject}")}
-     +  end
-     +
-        defp handle_info(_message, socket), do: {:cont, socket}
-     '''},
-    {"lib/my_app_web/components/layouts.ex", "the layout",
-     ~S'''
-        def app(assigns) do
-          ~H"""
-     +    <header>
-     +      <.link navigate={~p"/inbox"}>Inbox <span>{@unread}</span></.link>
-     +    </header>
-          <aside>
-            <.link navigate={~p"/inbox"}>Inbox <span>{@unread}</span></.link>
-          </aside>
-          <main>{render_slot(@inner_block)}</main>
-          <.flash_group flash={@flash} />
-          """
-        end
-     '''},
-    {"lib/my_app_web/live/inbox_live.ex", "the page",
-     ~S'''
-        def handle_info({:inbox_changed, message}, socket) do
-          {:noreply, stream_insert(socket, :messages, message)}
-        end
-     +
-     +  def handle_info({:new_message, message}, socket) do
-     +    {:noreply, stream_insert(socket, :messages, message, at: 0)}
-     +  end
-     '''}
-  ]
-
-  @ds_pr [
-    {"lib/my_app_web/components/layouts.ex", "the layout",
-     ~S'''
-        def app(assigns) do
-          ~H"""
-     +    <header><.unread_badge id="header" unread={@unread} /></header>
-     -    <aside><.unread_badge unread={@unread} /></aside>
-     +    <aside><.unread_badge id="sidebar" unread={@unread} /></aside>
-          <main>{render_slot(@inner_block)}</main>
-     +    <div id="toasts" role="status"></div>
-          <.flash_group flash={@flash} />
-          """
-        end
-      
-     +  attr :id, :string, required: true
-        attr :unread, :integer, required: true
-      
-        def unread_badge(assigns) do
-          ~H"""
-     -    <a id="sidebar" href={~p"/inbox"}>Inbox <span>{@unread}</span></a>
-     +    <a id={@id} href={~p"/inbox"}>Inbox <span>{@unread}</span></a>
-          """
-        end
-     +
-     +  attr :message, :map, required: true
-     +
-     +  def toast(assigns) do
-     +    ~H"""
-     +    <p data-init__delay.5s="el.remove()">New mail from {@message.from}: {@message.subject}</p>
-     +    """
-     +  end
-     '''},
-    {"lib/my_app_web/pages/inbox_page.ex", "the page",
-     ~S'''
-        def handle_info({:inbox_changed, message}, conn) do
-          conn
-          |> patch(&message_row/1, message: message)
-          |> patch_unread()
-        end
-     +
-     +  def handle_info({:new_message, message}, conn) do
-     +    conn
-     +    |> patch(&message_row/1, [message: message], selector: "#messages", mode: :prepend)
-     +    |> patch(&Layouts.toast/1, [message: message], selector: "#toasts", mode: :append)
-     +    |> patch_unread()
-     +  end
-      
-        defp patch_unread(conn) do
-     -    patch(conn, &Layouts.unread_badge/1, unread: Inbox.unread_count(conn.assigns.current_scope))
-     +    unread = Inbox.unread_count(conn.assigns.current_scope)
-     +
-     +    conn
-     +    |> patch(&Layouts.unread_badge/1, id: "sidebar", unread: unread)
-     +    |> patch(&Layouts.unread_badge/1, id: "header", unread: unread)
-        end
-     '''}
   ]
 
   @impl Dstar.Page
@@ -401,17 +108,17 @@ defmodule DstarDemoWeb.HomePage do
         assigns,
         Map.new(
           stages: @stages,
-          lv_files: @lv_files,
-          ds_files: @ds_files,
-          lv_pr: @lv_pr,
-          ds_pr: @ds_pr,
+          lv_files: HomeCode.files(:lv),
+          ds_files: HomeCode.files(:ds),
+          lv_pr: HomeCode.pr(:lv),
+          ds_pr: HomeCode.pr(:ds),
           bench: bench_memory(),
           snippet: DstarDemoWeb.Snippets.fetch!(:home)
         )
       )
 
     ~H"""
-    <.article_shell signals={%{stage: 1, dxFiles: "lv", dxLane: "ds", dxPr: "lv"}}>
+    <.article_shell signals={%{stage: 1, dxFiles: "lv", dxLane: "ds", dxPr: "lv", dxView: "diagram"}}>
       <.lede
         eyebrow="An inbox grows up"
         title="Interactive, without staying connected"
@@ -453,7 +160,7 @@ defmodule DstarDemoWeb.HomePage do
           </.para>
         </div>
 
-        <div class="mt-10 grid gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <div class="mt-10 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
           <div class="order-2 lg:order-1">
             <.step n={1} title="A page with buttons" signal="stage" id_prefix="dx-stage">
               <p>
@@ -471,24 +178,35 @@ defmodule DstarDemoWeb.HomePage do
                 that answers with HTML patches. Between clicks, nothing is open and nothing is
                 held. The page is interactive, and it isn't connected.
               </p>
+              <:extra><.inline_code n={1} /></:extra>
             </.step>
-            <.step n={2} title="Log in, please" signal="stage" id_prefix="dx-stage">
+            <.step n={2} title="Your plugs, twice" signal="stage" id_prefix="dx-stage">
               <p>
                 <strong>LiveView:</strong>
                 <code>phx.gen.auth</code>
-                puts <code>pipe_through :require_authenticated_user</code>
-                on the scope, and the same check in an <code>on_mount</code>
-                hook on the <code>live_session</code>. That's the documented pattern, and it's
-                sound: the WebSocket never runs the router pipeline, and <code>on_mount</code>
-                guards both the HTTP render and every socket mount. It's still a second path in,
-                written in a second place, and the two have to agree.
+                writes the login check twice: <code>pipe_through :require_authenticated_user</code>
+                for the HTTP render, and an <code>on_mount</code>
+                hook on the <code>live_session</code>
+                for the socket, which never runs the router pipeline. That's the documented
+                pattern, and it's sound.
+              </p>
+              <p>
+                Then you add a plug of your own, say the reader's language from <code>Accept-Language</code>. It sets the Gettext locale for the HTTP render. But the LiveView is
+                a new process, Gettext keeps the locale per process, and the socket can't read that
+                header at all. So the plug also hands its answer over in the session, and an
+                <code>on_mount</code>
+                sets it again. Every plug that feeds the page gets that second half. Forget it and
+                nothing fails: the page renders in the reader's language, then switches to the
+                default as soon as the socket connects.
               </p>
               <p>
                 <strong>Dstar:</strong>
-                the same <code>pipe_through</code>, and that's the only path. The GET, every event
-                POST and every stream connect are ordinary requests. Page-specific rules ("is this
-                my message?") go in <code>authorize/2</code>, which runs before every event.
+                the same plug, once. The GET, every click and every stream are requests through
+                it, each in its own process, so the locale holds for whatever that request
+                renders. Page-specific rules ("is this my message?") go in <code>authorize/2</code>,
+                which runs before every event.
               </p>
+              <:extra><.inline_code n={2} /></:extra>
             </.step>
             <.step n={3} title="The sidebar wants to know" signal="stage" id_prefix="dx-stage">
               <p>
@@ -513,6 +231,7 @@ defmodule DstarDemoWeb.HomePage do
                 in the response it's already sending, and nothing owns it. The flip side: nothing
                 keeps it fresh for you either. Whatever changes the count has to patch it.
               </p>
+              <:extra><.inline_code n={3} /></:extra>
             </.step>
             <.step n={4} title="Other tabs want to know" signal="stage" id_prefix="dx-stage">
               <p>Open the inbox in two tabs. Mark one read. The other should follow.</p>
@@ -535,6 +254,7 @@ defmodule DstarDemoWeb.HomePage do
                   ~p"/explained/lab#benchmark"
                 }>the benchmark</.inline_link>. The difference is that you opened it here, for this page, because it needed one.
               </p>
+              <:extra><.inline_code n={4} /></:extra>
             </.step>
             <.step n={5} title="Then you deploy" signal="stage" id_prefix="dx-stage">
               <p>
@@ -552,12 +272,13 @@ defmodule DstarDemoWeb.HomePage do
                 mid-deploy is just a request, and Datastar retries it until a server answers.
               </p>
               <.deploy_demo lab={@lab} />
+              <:extra><.inline_code n={5} /></:extra>
             </.step>
           </div>
 
           <div class="sticky top-0 z-10 order-1 self-start lg:static lg:order-2 lg:self-stretch">
             <div class="-mx-5 border-b border-base-300 bg-base-100/95 px-5 py-3 backdrop-blur sm:-mx-8 sm:px-8 lg:sticky lg:top-[10vh] lg:mx-0 lg:border lg:bg-base-100 lg:p-5">
-              <.arrows stages={@stages} bench={@bench} />
+              <.arrows stages={@stages} bench={@bench} code_view />
             </div>
           </div>
         </div>
@@ -565,10 +286,10 @@ defmodule DstarDemoWeb.HomePage do
 
       <section id="code" class="mx-auto mt-24 max-w-[860px]">
         <div class="max-w-[68ch]">
-          <.section_heading>The whole feature, as code</.section_heading>
+          <.section_heading>The finished inbox, as code</.section_heading>
           <.para>
-            The inbox with login, a layout badge and live tabs, written both ways. These are
-            illustrative excerpts on top of <code>phx.gen.auth</code>, which generates the same
+            All five stages stacked: login, the locale plug, a layout badge and live tabs,
+            written both ways. These are illustrative excerpts on top of <code>phx.gen.auth</code>, which generates the same
             <code>user_auth.ex</code>
             for both apps, so it isn't counted. Neither is the <code>Inbox</code>
             context, which is the same in both.
@@ -799,6 +520,121 @@ defmodule DstarDemoWeb.HomePage do
   defp kb(bytes) when is_number(bytes), do: round(bytes / 1024)
   defp kb(_), do: 0
 
+  # ── The code view ─────────────────────────────────────────────────────
+
+  @lanes [{:lv, "LiveView", "neutral"}, {:ds, "Dstar", "primary"}]
+
+  attr :key, :string, required: true
+  attr :label, :string, required: true
+  attr :icon, :string, required: true
+
+  defp view_button(assigns) do
+    ~H"""
+    <button
+      type="button"
+      role="tab"
+      data-on:click={"$dxView = '#{@key}'"}
+      data-class={"{'!border-primary !text-base-content !bg-base-200': $dxView == '#{@key}'}"}
+      data-attr:aria-selected={"$dxView == '#{@key}'"}
+      class="inline-flex items-center gap-1.5 rounded-md border border-base-300 px-2.5 py-1 text-xs font-medium text-base-content/65 transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+    >
+      <.icon name={@icon} class="size-3.5" /> {@label}
+    </button>
+    """
+  end
+
+  attr :stages, :list, required: true
+
+  # lg and up: the sticky panel's code view, one stage and one lane at a time.
+  defp stage_code_panel(assigns) do
+    assigns = assign(assigns, lanes: @lanes)
+
+    ~H"""
+    <div
+      id="dx-code-view"
+      data-show="$dxView == 'code'"
+      style="display: none"
+      class="mt-3 max-h-[62vh] overflow-y-auto overscroll-contain"
+    >
+      <div
+        :for={{lane, name, tone} <- @lanes}
+        data-show={"$dxLane == '#{lane}'"}
+        style={lane != :ds && "display: none"}
+      >
+        <div
+          :for={{n, _title} <- @stages}
+          id={"dx-code-#{lane}-#{n}"}
+          data-show={"$stage == #{n}"}
+          style={n != 1 && "display: none"}
+        >
+          <.stage_code n={n} lane={lane} name={name} tone={tone} />
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  attr :n, :integer, required: true
+
+  # Below lg: the same code under each step, folded away until asked for.
+  defp inline_code(assigns) do
+    assigns = assign(assigns, lanes: @lanes)
+
+    ~H"""
+    <details class="group border border-base-300 lg:hidden">
+      <summary class="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium [&::-webkit-details-marker]:hidden">
+        <span class="flex items-center gap-2">
+          <.icon name="hero-code-bracket-micro" class="size-4 opacity-60" /> The code at this step
+        </span>
+        <.icon
+          name="hero-chevron-down-micro"
+          class="size-4 transition-transform group-open:rotate-180"
+        />
+      </summary>
+      <div class="space-y-5 border-t border-base-300 p-3">
+        <.stage_code :for={{lane, name, tone} <- @lanes} n={@n} lane={lane} name={name} tone={tone} />
+      </div>
+    </details>
+    """
+  end
+
+  attr :n, :integer, required: true
+  attr :lane, :atom, required: true
+  attr :name, :string, required: true
+  attr :tone, :string, required: true
+
+  defp stage_code(assigns) do
+    files = HomeCode.stage(assigns.n, assigns.lane)
+    so_far = Enum.sum(for n <- 1..assigns.n, do: HomeCode.added_lines(n, assigns.lane))
+
+    assigns =
+      assign(assigns,
+        files: files,
+        added: HomeCode.added_lines(assigns.n, assigns.lane),
+        so_far: so_far
+      )
+
+    ~H"""
+    <div class="space-y-3">
+      <p class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-sm">
+        <span class="flex items-center gap-2 font-semibold"><.swatch tone={@tone} /> {@name}</span>
+        <span class="font-mono text-[11px] text-base-content/65">
+          <%= if @files == [] do %>
+            no code changes · {@so_far} lines so far
+          <% else %>
+            +{@added} lines in {length(@files)} {if(length(@files) == 1, do: "file", else: "files")} · {@so_far} so far
+          <% end %>
+        </span>
+      </p>
+      <p :if={@files == []} class="text-sm leading-6 text-base-content/70">
+        A deploy needs no code in either model. What differs is what runs when it happens: press
+        Deploy and watch the counters.
+      </p>
+      <.diff_file :for={{file, lines} <- @files} file={file} lines={lines} />
+    </div>
+    """
+  end
+
   # ── Stage 5: deploy, in place ─────────────────────────────────────────
 
   attr :lab, :map, required: true
@@ -922,6 +758,7 @@ defmodule DstarDemoWeb.HomePage do
 
   attr :stages, :list, required: true
   attr :bench, :map, required: true
+  attr :code_view, :boolean, default: false
 
   @doc false
   def arrows(assigns) do
@@ -953,186 +790,203 @@ defmodule DstarDemoWeb.HomePage do
         </div>
       </div>
 
+      <%!-- The code view lives in this panel from lg up. Below lg the panel is
+      already at its height limit, so each step shows its code inline instead. --%>
+      <div :if={@code_view} class="mt-3 hidden gap-1 lg:flex" role="tablist" aria-label="View">
+        <.view_button key="diagram" label="Diagram" icon="hero-share-micro" />
+        <.view_button key="code" label="Code" icon="hero-code-bracket-micro" />
+      </div>
+
       <%!-- Both panels stacked are taller than a phone screen, which breaks the
-      sticky diagram. Below lg, show one model at a time. --%>
-      <div class="mt-3 flex border-b border-base-300 lg:hidden" role="tablist" aria-label="Model">
+      sticky diagram. Below lg, show one model at a time; the code view uses
+      the same tabs at every width. --%>
+      <div
+        class="mt-3 flex border-b border-base-300 lg:hidden"
+        data-class="{'lg:!flex': $dxView == 'code'}"
+        role="tablist"
+        aria-label="Model"
+      >
         <.tab_button signal="dxLane" key="lv" label="LiveView" />
         <.tab_button signal="dxLane" key="ds" label="Dstar" />
       </div>
 
-      <%!-- Both lanes use the same three counters. Processes and memory per
+      <.stage_code_panel :if={@code_view} stages={@stages} />
+
+      <div data-show="$dxView != 'code'">
+        <%!-- Both lanes use the same three counters. Processes and memory per
       open tab are the benchmark's measured medians. --%>
-      <.panel name="LiveView" tone="neutral" lane="lv">
-        <:tally>
-          <.tally id="lv-auth" label="auth paths" expr="$stage >= 2 ? 2 : 0" initial="0" />
-          <.tally id="lv-procs" label="processes per tab" expr="2" initial="2" />
-          <.tally
-            id="lv-memory"
-            label="memory per tab"
-            expr={"'#{@bench.lv} KB'"}
-            initial={"#{@bench.lv} KB"}
-          />
-        </:tally>
-        <svg viewBox="0 0 360 206" class="w-full" role="img" aria-label="LiveView architecture">
-          <.svg_defs id="lv" />
-          <.box x={8} y={78} w={64} label="Browser" />
-          <.box x={118} y={16} w={92} label="router plugs" sub="HTTP only" hot="$stage == 2" />
-          <%!-- socket path: straight in until on_mount exists --%>
-          <g data-show="$stage == 1">
-            <path
-              d="M72 102 C 150 140, 190 130, 244 112"
-              class="dx-wire dx-wire-hot"
-              marker-end="url(#lv-head)"
+        <.panel name="LiveView" tone="neutral" lane="lv">
+          <:tally>
+            <.tally id="lv-auth" label="ways in" expr="2" initial="2" />
+            <.tally id="lv-procs" label="processes per tab" expr="2" initial="2" />
+            <.tally
+              id="lv-memory"
+              label="memory per tab"
+              expr={"'#{@bench.lv} KB'"}
+              initial={"#{@bench.lv} KB"}
             />
-            <text x="140" y="146" class="dx-sub">WebSocket</text>
-          </g>
-          <g data-show="$stage >= 2" style="display: none" class="dx-enter">
+          </:tally>
+          <svg viewBox="0 0 360 206" class="w-full" role="img" aria-label="LiveView architecture">
+            <.svg_defs id="lv" />
+            <.box x={8} y={78} w={64} label="Browser" />
+            <.box x={118} y={16} w={92} label="router plugs" sub="HTTP only" hot="$stage == 2" />
+            <%!-- socket path: straight in until on_mount exists --%>
+            <g data-show="$stage == 1">
+              <path
+                d="M72 102 C 150 140, 190 130, 244 112"
+                class="dx-wire dx-wire-hot"
+                marker-end="url(#lv-head)"
+              />
+              <text x="140" y="146" class="dx-sub">WebSocket</text>
+            </g>
+            <g data-show="$stage >= 2" style="display: none" class="dx-enter">
+              <.box
+                x={118}
+                y={120}
+                w={92}
+                label="on_mount"
+                sub="plugs, again"
+                sub_expr="$stage >= 3 ? 'plugs + @unread' : 'plugs, again'"
+                hot="$stage == 2 || $stage == 3"
+              />
+              <path
+                d="M72 104 L 118 134"
+                class="dx-wire dx-wire-hot"
+                data-class="{'dx-wire-bad': $stage == 5}"
+                marker-end="url(#lv-head)"
+              />
+              <path
+                d="M210 136 L 244 126"
+                class="dx-wire dx-wire-hot"
+                data-class="{'dx-wire-bad': $stage == 5}"
+                marker-end="url(#lv-head)"
+              />
+              <text x="64" y="150" class="dx-sub" data-show="$stage == 5" style="display: none">
+                rejoin!
+              </text>
+            </g>
+            <%!-- HTTP path --%>
+            <path d="M72 88 L 118 40" class="dx-wire" marker-end="url(#lv-head)" />
+            <path d="M210 34 L 252 62" class="dx-wire" marker-end="url(#lv-head)" />
+            <%!-- the one InboxLive process; from stage 3 the layout renders inside it --%>
+            <rect
+              x="244"
+              y="50"
+              width="108"
+              height="56"
+              class="dx-proc"
+              data-class="{'dx-proc-tall': $stage >= 3}"
+            />
+            <text x="248" y="46" class="dx-sub">1 process / tab</text>
             <.box
-              x={118}
-              y={120}
+              x={252}
+              y={60}
               w={92}
-              label="on_mount"
-              sub="auth, again"
-              sub_expr="$stage >= 3 ? 'auth + @unread' : 'auth, again'"
-              hot="$stage == 2 || $stage == 3"
+              label="InboxLive"
+              sub="mount/3 ×2"
+              sub_expr="$stage == 5 ? 'mount/3 again' : 'mount/3 ×2'"
+              hot="$stage == 1 || $stage == 5"
             />
-            <path
-              d="M72 104 L 118 134"
-              class="dx-wire dx-wire-hot"
-              data-class="{'dx-wire-bad': $stage == 5}"
-              marker-end="url(#lv-head)"
+            <g data-show="$stage >= 3" style="display: none" class="dx-enter">
+              <.box x={252} y={104} w={92} label="Layouts.app" sub="@unread badge" hot="$stage == 3" />
+            </g>
+            <g data-show="$stage >= 4" style="display: none" class="dx-enter">
+              <.box x={130} y={172} w={68} label="PubSub" hot="$stage == 4" />
+              <path
+                d="M198 182 C 224 182, 236 168, 250 150"
+                class="dx-wire dx-wire-hot"
+                marker-end="url(#lv-head)"
+              />
+              <text x="214" y="198" class="dx-sub">attach_hook</text>
+            </g>
+          </svg>
+        </.panel>
+
+        <.panel name="Dstar" tone="primary" lane="ds">
+          <:tally>
+            <.tally id="ds-auth" label="ways in" expr="1" initial="1" />
+            <.tally id="ds-procs" label="processes per tab" expr="$stage >= 4 ? 1 : 0" initial="0" />
+            <.tally
+              id="ds-memory"
+              label="memory per tab"
+              expr={"$stage >= 4 ? '#{@bench.ds} KB' : '≈ 0 KB'"}
+              initial="≈ 0 KB"
             />
-            <path
-              d="M210 136 L 244 126"
-              class="dx-wire dx-wire-hot"
-              data-class="{'dx-wire-bad': $stage == 5}"
-              marker-end="url(#lv-head)"
+          </:tally>
+          <svg viewBox="0 0 360 210" class="w-full" role="img" aria-label="Dstar architecture">
+            <.svg_defs id="ds" />
+            <rect x="8" y="58" width="72" height="82" class="dx-box" />
+            <text x="16" y="74" class="dx-text">Browser</text>
+            <g data-show="$stage >= 3" style="display: none" class="dx-enter">
+              <rect x="16" y="84" width="56" height="18" class="dx-box dx-box-hot" />
+              <text x="22" y="96" class="dx-sub">#sidebar</text>
+            </g>
+            <rect x="16" y="110" width="56" height="18" class="dx-box" />
+            <text x="22" y="122" class="dx-sub">#list</text>
+
+            <.box
+              x={130}
+              y={78}
+              w={114}
+              label="router plugs"
+              sub="GET · events · streams"
+              hot="$stage == 2 || $stage == 5"
             />
-            <text x="64" y="150" class="dx-sub" data-show="$stage == 5" style="display: none">
-              rejoin!
-            </text>
-          </g>
-          <%!-- HTTP path --%>
-          <path d="M72 88 L 118 40" class="dx-wire" marker-end="url(#lv-head)" />
-          <path d="M210 34 L 252 62" class="dx-wire" marker-end="url(#lv-head)" />
-          <%!-- the one InboxLive process; from stage 3 the layout renders inside it --%>
-          <rect
-            x="244"
-            y="50"
-            width="108"
-            height="56"
-            class="dx-proc"
-            data-class="{'dx-proc-tall': $stage >= 3}"
-          />
-          <text x="248" y="46" class="dx-sub">1 process / tab</text>
-          <.box
-            x={252}
-            y={60}
-            w={92}
-            label="InboxLive"
-            sub="mount/3 ×2"
-            sub_expr="$stage == 5 ? 'mount/3 again' : 'mount/3 ×2'"
-            hot="$stage == 1 || $stage == 5"
-          />
-          <g data-show="$stage >= 3" style="display: none" class="dx-enter">
-            <.box x={252} y={104} w={92} label="Layouts.app" sub="@unread badge" hot="$stage == 3" />
-          </g>
-          <g data-show="$stage >= 4" style="display: none" class="dx-enter">
-            <.box x={130} y={172} w={68} label="PubSub" hot="$stage == 4" />
+            <path d="M80 92 L 130 94" class="dx-wire" marker-end="url(#ds-head)" />
+            <text x="86" y="84" class="dx-sub">POST</text>
+            <path d="M244 94 L 262 72" class="dx-wire" marker-end="url(#ds-head)" />
+            <.box x={262} y={50} w={90} label="InboxPage" sub="handle_event/3" hot="$stage == 3" />
+
+            <%!-- every click is answered with patches; the badge joins at stage 3 --%>
             <path
-              d="M198 182 C 224 182, 236 168, 250 150"
+              d="M262 64 C 200 20, 120 30, 74 112"
               class="dx-wire dx-wire-hot"
-              marker-end="url(#lv-head)"
-            />
-            <text x="214" y="198" class="dx-sub">attach_hook</text>
-          </g>
-        </svg>
-      </.panel>
-
-      <.panel name="Dstar" tone="primary" lane="ds">
-        <:tally>
-          <.tally id="ds-auth" label="auth paths" expr="$stage >= 2 ? 1 : 0" initial="0" />
-          <.tally id="ds-procs" label="processes per tab" expr="$stage >= 4 ? 1 : 0" initial="0" />
-          <.tally
-            id="ds-memory"
-            label="memory per tab"
-            expr={"$stage >= 4 ? '#{@bench.ds} KB' : '≈ 0 KB'"}
-            initial="≈ 0 KB"
-          />
-        </:tally>
-        <svg viewBox="0 0 360 210" class="w-full" role="img" aria-label="Dstar architecture">
-          <.svg_defs id="ds" />
-          <rect x="8" y="58" width="72" height="82" class="dx-box" />
-          <text x="16" y="74" class="dx-text">Browser</text>
-          <g data-show="$stage >= 3" style="display: none" class="dx-enter">
-            <rect x="16" y="84" width="56" height="18" class="dx-box dx-box-hot" />
-            <text x="22" y="96" class="dx-sub">#sidebar</text>
-          </g>
-          <rect x="16" y="110" width="56" height="18" class="dx-box" />
-          <text x="22" y="122" class="dx-sub">#list</text>
-
-          <.box
-            x={130}
-            y={78}
-            w={114}
-            label="router plugs"
-            sub="GET · events · streams"
-            hot="$stage == 2 || $stage == 5"
-          />
-          <path d="M80 92 L 130 94" class="dx-wire" marker-end="url(#ds-head)" />
-          <text x="86" y="84" class="dx-sub">POST</text>
-          <path d="M244 94 L 262 72" class="dx-wire" marker-end="url(#ds-head)" />
-          <.box x={262} y={50} w={90} label="InboxPage" sub="handle_event/3" hot="$stage == 3" />
-
-          <%!-- every click is answered with patches; the badge joins at stage 3 --%>
-          <path
-            d="M262 64 C 200 20, 120 30, 74 112"
-            class="dx-wire dx-wire-hot"
-            data-attr:d="$stage >= 3 ? 'M262 64 C 200 20, 120 30, 74 88' : 'M262 64 C 200 20, 120 30, 74 112'"
-            marker-end="url(#ds-head)"
-          />
-          <text
-            x="140"
-            y="34"
-            class="dx-sub"
-            data-text="$stage >= 3 ? 'SSE: #list + #sidebar' : 'SSE: #list'"
-          >
-            SSE: #list
-          </text>
-
-          <g data-show="$stage >= 4" style="display: none" class="dx-enter">
-            <path
-              d="M80 130 C 120 150, 150 140, 176 112"
-              class="dx-wire dx-wire-hot"
-              data-class="{'dx-wire-bad': $stage == 5}"
+              data-attr:d="$stage >= 3 ? 'M262 64 C 200 20, 120 30, 74 88' : 'M262 64 C 200 20, 120 30, 74 112'"
               marker-end="url(#ds-head)"
             />
             <text
-              x="88"
-              y="158"
+              x="140"
+              y="34"
               class="dx-sub"
-              data-text="$stage == 5 ? 'connect() again' : 'connect() stream'"
+              data-text="$stage >= 3 ? 'SSE: #list + #sidebar' : 'SSE: #list'"
             >
-              connect() stream
+              SSE: #list
             </text>
-            <rect x="254" y="142" width="104" height="50" class="dx-proc" />
-            <text x="258" y="204" class="dx-sub">1 process / tab</text>
-            <.box
-              x={262}
-              y={150}
-              w={88}
-              label="the stream"
-              sub="handle_info/2"
-              hot="$stage == 4 || $stage == 5"
-            />
-            <path d="M306 150 L 306 100" class="dx-wire dx-wire-hot" marker-end="url(#ds-head)" />
-          </g>
-        </svg>
-      </.panel>
 
-      <p class="mt-3 text-[11px] leading-4 text-base-content/60 max-lg:hidden">
-        Processes and memory per open tab: measured medians from the benchmark, {@bench.tabs} tabs. A Dstar page without a stream holds neither.
-      </p>
+            <g data-show="$stage >= 4" style="display: none" class="dx-enter">
+              <path
+                d="M80 130 C 120 150, 150 140, 176 112"
+                class="dx-wire dx-wire-hot"
+                data-class="{'dx-wire-bad': $stage == 5}"
+                marker-end="url(#ds-head)"
+              />
+              <text
+                x="88"
+                y="158"
+                class="dx-sub"
+                data-text="$stage == 5 ? 'connect() again' : 'connect() stream'"
+              >
+                connect() stream
+              </text>
+              <rect x="254" y="142" width="104" height="50" class="dx-proc" />
+              <text x="258" y="204" class="dx-sub">1 process / tab</text>
+              <.box
+                x={262}
+                y={150}
+                w={88}
+                label="the stream"
+                sub="handle_info/2"
+                hot="$stage == 4 || $stage == 5"
+              />
+              <path d="M306 150 L 306 100" class="dx-wire dx-wire-hot" marker-end="url(#ds-head)" />
+            </g>
+          </svg>
+        </.panel>
+
+        <p class="mt-3 text-[11px] leading-4 text-base-content/60 max-lg:hidden">
+          Processes and memory per open tab: measured medians from the benchmark, {@bench.tabs} tabs. A Dstar page without a stream holds neither.
+        </p>
+      </div>
     </div>
     """
   end
