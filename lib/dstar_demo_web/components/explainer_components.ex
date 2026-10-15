@@ -42,6 +42,12 @@ defmodule DstarDemoWeb.ExplainerComponents do
             >
               Explained
             </a>
+            <a
+              href={~p"/showcase"}
+              class="text-sm font-medium text-base-content/70 transition hover:text-base-content"
+            >
+              Showcase
+            </a>
             <Layouts.theme_toggle />
           </nav>
         </header>
@@ -54,6 +60,7 @@ defmodule DstarDemoWeb.ExplainerComponents do
 
   attr :eyebrow, :string, required: true
   attr :title, :string, required: true
+  attr :byline, :string, default: nil
   slot :dek, doc: "one sentence under the H1 for readers who arrive cold"
   slot :inner_block, required: true
 
@@ -64,7 +71,8 @@ defmodule DstarDemoWeb.ExplainerComponents do
         <a href={~p"/explained"} class="transition hover:text-base-content">Explained</a>
         <span aria-hidden="true">·</span> {@eyebrow}
       </p>
-      <h1 class="mt-3 text-4xl font-semibold tracking-tight sm:text-5xl">{@title}</h1>
+      <h1 class="mt-3 text-4xl font-semibold tracking-tight text-balance sm:text-5xl">{@title}</h1>
+      <p :if={@byline} id="byline-top" class="mt-3 text-sm text-base-content/60">{@byline}</p>
       <p
         :if={@dek != []}
         id="dek"

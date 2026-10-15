@@ -6,20 +6,19 @@ defmodule DstarDemoWeb.OgCardPage do
   To regenerate, run the dev server and screenshot each card at a
   1200×630 viewport into `priv/static/images/og/<card>.png`:
 
-      /dev/og/explained-dx   /dev/og/explained-lab   /dev/og/default
+      /dev/og/home   /dev/og/explained-lab   /dev/og/default
   """
   use DstarDemoWeb, :dstar_page
 
   alias DstarDemo.ChaosLab
-  alias DstarDemoWeb.ExplainedDxPage
+  alias DstarDemoWeb.HomePage
   alias DstarDemoWeb.ExplainedLabPage
 
   @cards %{
-    "explained-dx" => %{
-      kicker: "Explained · follow the arrows",
-      title: "An inbox grows up",
-      dek:
-        "Login, a layout badge, live tabs and a deploy. Phoenix LiveView 1.8 and Dstar, arrow by arrow."
+    "home" => %{
+      kicker: "Dstar for Phoenix",
+      title: "Interactive, without staying connected",
+      dek: "Every click is a request. Live is one attribute, where you need it."
     },
     "explained-lab" => %{
       kicker: "Explained · the chaos lab",
@@ -51,7 +50,7 @@ defmodule DstarDemoWeb.OgCardPage do
       id="og-card"
       data-theme="dark"
       class="relative flex h-[630px] w-[1200px] overflow-hidden bg-base-100 text-base-content"
-      data-signals={Jason.encode!(%{stage: 4, dxLane: "lv"})}
+      data-signals={Jason.encode!(%{stage: 3, dxLane: "lv"})}
     >
       <div class="absolute inset-x-0 top-0 h-1.5 bg-primary"></div>
       <div class="flex w-[640px] shrink-0 flex-col justify-between px-16 py-16 [font-family:'Space_Grotesk',ui-sans-serif,system-ui]">
@@ -59,7 +58,9 @@ defmodule DstarDemoWeb.OgCardPage do
           <p class="font-mono text-lg tracking-wide text-base-content/60 uppercase">
             {@copy.kicker}
           </p>
-          <h1 class="mt-6 text-[76px] leading-[1.02] font-bold tracking-tight">{@copy.title}</h1>
+          <h1 class="mt-6 text-[64px] leading-[1.04] font-bold tracking-tight text-balance">
+            {@copy.title}
+          </h1>
           <p class="mt-8 text-[28px] leading-[1.35] text-base-content/75">{@copy.dek}</p>
         </div>
         <p class="flex items-center gap-3 text-xl font-semibold">
@@ -92,13 +93,13 @@ defmodule DstarDemoWeb.OgCardPage do
   defp visual(assigns) do
     assigns =
       assign(assigns,
-        stages: [{1, ""}, {2, ""}, {3, ""}, {4, "Other tabs want to know"}, {5, ""}],
-        bench: ExplainedDxPage.bench_memory()
+        stages: [{1, ""}, {2, ""}, {3, "The sidebar wants to know"}, {4, ""}, {5, ""}],
+        bench: HomePage.bench_memory()
       )
 
     ~H"""
     <div class="mx-auto w-[400px] [&_#dx-diagram>div:first-child]:hidden [&_#dx-diagram>p:last-child]:hidden">
-      <ExplainedDxPage.arrows stages={@stages} bench={@bench} />
+      <HomePage.arrows stages={@stages} bench={@bench} />
     </div>
     """
   end

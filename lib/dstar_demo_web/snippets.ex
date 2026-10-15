@@ -31,8 +31,8 @@ defmodule DstarDemoWeb.Snippets do
       liveview: nil,
       note: nil
     },
-    explained_dx: %{
-      source: "#{@pages}/explained_dx_page.ex",
+    home: %{
+      source: "#{@pages}/home_page.ex",
       wiring_language: "elixir",
       wiring: """
       def handle_event(conn, "read:" <> id, _signals) do
