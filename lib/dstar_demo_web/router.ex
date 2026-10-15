@@ -21,8 +21,8 @@ defmodule DstarDemoWeb.Router do
     pipe_through :browser
 
     dstar("/", HomePage)
+    dstar("/showcase", ShowcasePage)
     dstar("/explained", ExplainedIndexPage)
-    dstar("/explained/dx", ExplainedDxPage)
     dstar("/explained/lab", ExplainedLabPage)
     dstar("/examples", ExamplesPage)
     dstar("/collections", LiveCollectionsPage)
@@ -41,6 +41,9 @@ defmodule DstarDemoWeb.Router do
 
   scope "/", DstarDemoWeb do
     get "/sitemap.xml", SitemapController, :index
+
+    # The inbox story was /explained/dx before it became the home page.
+    get "/explained/dx", RedirectController, :permanent, assigns: %{to: "/"}
   end
 
   # Other scopes may use custom stacks.

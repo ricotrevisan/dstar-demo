@@ -2,7 +2,7 @@ defmodule DstarDemoWeb.SeoTest do
   use DstarDemoWeb.ConnCase, async: true
 
   @articles [
-    {"/explained/dx", "/images/og/explained-dx.png"},
+    {"/", "/images/og/home.png"},
     {"/explained/lab", "/images/og/explained-lab.png"}
   ]
 
@@ -39,7 +39,7 @@ defmodule DstarDemoWeb.SeoTest do
     test "a page without its own meta still gets a description, canonical and default card", %{
       conn: conn
     } do
-      head = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
+      head = conn |> get(~p"/showcase") |> html_response(200) |> LazyHTML.from_document()
 
       assert [_] = meta(head, "meta[name='description']")
       assert meta(head, "meta[property='og:type']") == ["website"]
@@ -50,7 +50,7 @@ defmodule DstarDemoWeb.SeoTest do
   end
 
   describe "the flash group" do
-    for path <- ["/", "/examples", "/explained", "/explained/dx", "/explained/lab"] do
+    for path <- ["/", "/showcase", "/examples", "/explained", "/explained/lab"] do
       @path path
 
       test "comes after the H1 on #{path}", %{conn: conn} do
@@ -80,12 +80,13 @@ defmodule DstarDemoWeb.SeoTest do
 
     locs = Regex.scan(~r{<loc>([^<]+)</loc>}, body, capture: :all_but_first) |> List.flatten()
 
-    for path <- ["/", "/explained", "/explained/dx", "/explained/lab", "/examples"] do
+    for path <- ["/", "/showcase", "/explained", "/explained/lab", "/examples"] do
       assert (base <> path) in locs
     end
 
     paths = Enum.map(locs, &String.replace_prefix(&1, base, ""))
     refute Enum.any?(paths, &(&1 =~ "_event" or &1 =~ "/dev" or &1 =~ ":"))
+    refute "/explained/dx" in paths
     assert body =~ "<lastmod>2026-10-14</lastmod>"
 
     for path <- paths do

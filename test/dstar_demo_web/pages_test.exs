@@ -3,8 +3,8 @@ defmodule DstarDemoWeb.PagesTest do
 
   import Dstar.Test
 
-  test "GET /", %{conn: conn} do
-    conn = get(conn, ~p"/")
+  test "GET /showcase", %{conn: conn} do
+    conn = get(conn, ~p"/showcase")
     response = html_response(conn, 200)
 
     assert response =~ "Dstar server UI showcase"

@@ -1,4 +1,4 @@
-defmodule DstarDemoWeb.ExplainedDxPageTest do
+defmodule DstarDemoWeb.HomePageTest do
   # DstarDemo.Inbox is one shared, named process.
   use DstarDemoWeb.ConnCase, async: false
 
@@ -9,13 +9,13 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
     :ok
   end
 
-  test "GET /explained/dx renders five scroll stages, the code and the live inbox", %{
+  test "GET / renders five scroll stages, the code and the live inbox", %{
     conn: conn
   } do
-    document = conn |> get(~p"/explained/dx") |> html_response(200) |> LazyHTML.from_document()
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
 
     for n <- 1..5 do
-      step = LazyHTML.query(document, "#dx-stage-#{n}")
+      step = LazyHTML.query(document, "#dx-stage-#{n} [data-on-intersect__half]")
       assert LazyHTML.attribute(step, "data-on-intersect__half") == ["$stage = #{n}"]
     end
 
@@ -32,7 +32,7 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
 
   test "the LiveView lane is the Phoenix 1.8 version: one process, a hook, no nested LiveView",
        %{conn: conn} do
-    html = conn |> get(~p"/explained/dx") |> html_response(200)
+    html = conn |> get(~p"/") |> html_response(200)
     document = LazyHTML.from_document(html)
 
     # Code is server-rendered text, so crawlers and no-JS readers get it.
@@ -48,8 +48,28 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
     end
   end
 
+  test "each stage's code is server-rendered twice: in the sticky code view and inline for phones",
+       %{conn: conn} do
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
+
+    for lane <- ~w(lv ds), n <- 1..5 do
+      block = LazyHTML.query(document, "#dx-code-#{lane}-#{n}")
+      assert LazyHTML.attribute(block, "data-show") == ["$stage == #{n}"]
+    end
+
+    for n <- 1..5 do
+      assert document |> LazyHTML.query("#dx-stage-#{n} details") |> Enum.count() == 1
+    end
+
+    # Stage 2 is the double-routing step: the LiveView lane hands the locale over.
+    stage2 = document |> LazyHTML.query("#dx-code-lv-2") |> LazyHTML.text()
+    assert stage2 =~ "put_session(conn, :locale, locale)"
+    assert stage2 =~ "def on_mount(:default, _params, session, socket)"
+    refute document |> LazyHTML.query("#dx-code-ds-2") |> LazyHTML.text() =~ "on_mount"
+  end
+
   test "the pull request toggle shows both diffs with their file counts", %{conn: conn} do
-    document = conn |> get(~p"/explained/dx") |> html_response(200) |> LazyHTML.from_document()
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
 
     for {lane, files} <- [{"lv", 3}, {"ds", 2}] do
       panel = LazyHTML.query(document, "#payoff-#{lane}")
@@ -77,7 +97,7 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
   end
 
   test "the page ends with the install line, docs, source, the lab and an author", %{conn: conn} do
-    document = conn |> get(~p"/explained/dx") |> html_response(200) |> LazyHTML.from_document()
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
     ending = LazyHTML.query(document, "#try-dstar")
 
     assert LazyHTML.text(ending) =~ ~s({:dstar, "~> 0.3.0"})
@@ -95,7 +115,7 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
   end
 
   test "every internal link on the explainers resolves", %{conn: conn} do
-    for page <- [~p"/explained", ~p"/explained/dx", ~p"/explained/lab"] do
+    for page <- [~p"/", ~p"/showcase", ~p"/explained", ~p"/explained/lab"] do
       hrefs =
         conn
         |> get(page)
@@ -111,15 +131,29 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
     end
   end
 
-  test "the home page links to the explainer", %{conn: conn} do
+  test "the story is the home page, says its claim first and links the showcase", %{conn: conn} do
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
+
+    assert document |> LazyHTML.query("h1") |> LazyHTML.text() =~
+             "Interactive, without staying connected"
+
+    assert "/showcase" in (document |> LazyHTML.query("header a") |> LazyHTML.attribute("href"))
+  end
+
+  test "the showcase links back to the story", %{conn: conn} do
     link =
       conn
-      |> get(~p"/")
+      |> get(~p"/showcase")
       |> html_response(200)
       |> LazyHTML.from_document()
       |> LazyHTML.query("#explainer-link")
 
-    assert LazyHTML.attribute(link, "href") == ["/explained/dx"]
+    assert LazyHTML.attribute(link, "href") == ["/"]
+  end
+
+  test "the old /explained/dx URL moves permanently to /", %{conn: conn} do
+    conn = get(conn, "/explained/dx")
+    assert redirected_to(conn, 301) == "/"
   end
 
   test "marking a message read changes the server's inbox and patches sidebar and list", %{
@@ -161,6 +195,6 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
 
     conn
     |> put_req_header("content-type", "application/json")
-    |> post("/explained/dx/_event/" <> event, Jason.encode!(%{csrf: csrf}))
+    |> post("/_event/" <> event, Jason.encode!(%{csrf: csrf}))
   end
 end

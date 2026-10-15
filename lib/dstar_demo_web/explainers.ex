@@ -7,11 +7,11 @@ defmodule DstarDemoWeb.Explainers do
 
   @explainers [
     %{
-      path: "/explained/dx",
-      title: "An inbox grows up",
-      kicker: "Follow the arrows",
+      path: "/",
+      title: "Interactive, without staying connected",
+      kicker: "An inbox grows up",
       summary:
-        "Login, a layout badge, live tabs and a deploy, built with Phoenix LiveView 1.8 and with Dstar. Where each arrow goes, and what it costs.",
+        "Login, a layout badge, live tabs and a deploy, built with Phoenix LiveView 1.8 and with Dstar. What staying connected costs, and who pays it.",
       published: ~D[2026-10-14]
     },
     %{

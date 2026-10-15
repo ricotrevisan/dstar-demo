@@ -150,8 +150,7 @@ defmodule DstarDemoWeb.ExplainedLabPage do
           />
         </div>
         <.para>
-          Want the story behind the counters?
-          <.xp_link href={~p"/explained/dx"}>Follow the arrows</.xp_link>
+          Want the story behind the counters? <.xp_link href={~p"/"}>Follow the arrows</.xp_link>
         </.para>
       </section>
 
