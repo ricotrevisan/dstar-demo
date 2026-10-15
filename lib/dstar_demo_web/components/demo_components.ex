@@ -17,6 +17,7 @@ defmodule DstarDemoWeb.DemoComponents do
     %{
       label: "Showcase",
       items: [
+        {"Showcase", "/showcase", "hero-squares-2x2-micro"},
         {"Live Collections", "/collections", "hero-rectangle-stack-micro"},
         {"Streaming", "/streaming", "hero-signal-micro"},
         {"Patch Lab", "/patch-lab", "hero-squares-plus-micro"},
