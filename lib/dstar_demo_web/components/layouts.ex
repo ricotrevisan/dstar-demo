@@ -118,7 +118,8 @@ defmodule DstarDemoWeb.Layouts do
   @doc """
   Provides dark vs light theme toggle based on themes defined in app.css.
 
-  See <head> in root.html.heex which applies the theme before page load.
+  The buttons dispatch `phx:set-theme` with a Datastar expression, which
+  assets/js/app.js handles, so the toggle doesn't need the LiveView client.
   """
   def theme_toggle(assigns) do
     ~H"""
@@ -135,7 +136,7 @@ defmodule DstarDemoWeb.Layouts do
 
       <button
         class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [:root:not([data-theme])_&]:text-primary-content"
-        phx-click={JS.dispatch("phx:set-theme")}
+        data-on:click="el.dispatchEvent(new CustomEvent('phx:set-theme', {bubbles: true}))"
         data-phx-theme="system"
         title="System theme"
         aria-label="Use the system theme"
@@ -145,7 +146,7 @@ defmodule DstarDemoWeb.Layouts do
 
       <button
         class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [[data-theme=light]_&]:text-primary-content"
-        phx-click={JS.dispatch("phx:set-theme")}
+        data-on:click="el.dispatchEvent(new CustomEvent('phx:set-theme', {bubbles: true}))"
         data-phx-theme="light"
         title="Light theme"
         aria-label="Use the light theme"
@@ -155,7 +156,7 @@ defmodule DstarDemoWeb.Layouts do
 
       <button
         class="relative grid size-8 cursor-pointer place-items-center rounded-full transition hover:text-base-content focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary [[data-theme=dark]_&]:text-primary-content"
-        phx-click={JS.dispatch("phx:set-theme")}
+        data-on:click="el.dispatchEvent(new CustomEvent('phx:set-theme', {bubbles: true}))"
         data-phx-theme="dark"
         title="Dark theme"
         aria-label="Use the dark theme"

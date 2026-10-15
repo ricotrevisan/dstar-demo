@@ -30,6 +30,87 @@ defmodule DstarDemoWeb.ExplainedDxPageTest do
     assert init =~ "@post("
   end
 
+  test "the LiveView lane is the Phoenix 1.8 version: one process, a hook, no nested LiveView",
+       %{conn: conn} do
+    html = conn |> get(~p"/explained/dx") |> html_response(200)
+    document = LazyHTML.from_document(html)
+
+    # Code is server-rendered text, so crawlers and no-JS readers get it.
+    code = document |> LazyHTML.query("#code pre") |> LazyHTML.text()
+    assert code =~ "attach_hook(:unread, :handle_info"
+    assert code =~ "MyAppWeb.Unread"
+    refute html =~ "SidebarLive"
+    refute html =~ "live_render"
+
+    # Both lanes count the same three things.
+    for lane <- ~w(lv ds), counter <- ~w(auth procs memory) do
+      assert document |> LazyHTML.query("##{lane}-#{counter}") |> Enum.count() == 1
+    end
+  end
+
+  test "the pull request toggle shows both diffs with their file counts", %{conn: conn} do
+    document = conn |> get(~p"/explained/dx") |> html_response(200) |> LazyHTML.from_document()
+
+    for {lane, files} <- [{"lv", 3}, {"ds", 2}] do
+      panel = LazyHTML.query(document, "#payoff-#{lane}")
+      assert LazyHTML.attribute(panel, "data-show") == ["$dxPr == '#{lane}'"]
+      assert panel |> LazyHTML.query("figure") |> Enum.count() == files
+      assert LazyHTML.text(panel) =~ "#{files} files"
+    end
+  end
+
+  test "the stage-5 deploy button runs the lab's deploy and patches the counters in place", %{
+    conn: conn
+  } do
+    DstarDemo.ChaosLab.Server.dispatch("reset")
+    before = DstarDemo.ChaosLab.Server.get()
+
+    body = conn |> post_event("lab_deploy") |> response(200)
+    after_deploy = DstarDemo.ChaosLab.Server.get()
+
+    assert after_deploy.lv.mounts > before.lv.mounts
+    assert after_deploy.ds.mounts == before.ds.mounts
+    assert body =~ ~s(id="dx-deploy")
+    assert body =~ "Someone deployed"
+  after
+    DstarDemo.ChaosLab.Server.dispatch("reset")
+  end
+
+  test "the page ends with the install line, docs, source, the lab and an author", %{conn: conn} do
+    document = conn |> get(~p"/explained/dx") |> html_response(200) |> LazyHTML.from_document()
+    ending = LazyHTML.query(document, "#try-dstar")
+
+    assert LazyHTML.text(ending) =~ ~s({:dstar, "~> 0.3.0"})
+    hrefs = ending |> LazyHTML.query("a") |> LazyHTML.attribute("href")
+
+    for {href, _title, _body} <- DstarDemoWeb.ExplainerComponents.try_links() do
+      assert href in hrefs
+    end
+
+    assert "/explained/lab" in hrefs
+    assert "https://rico.wtf" in hrefs
+
+    dek = LazyHTML.query(document, "#dek a") |> LazyHTML.attribute("href")
+    assert "https://data-star.dev" in dek
+  end
+
+  test "every internal link on the explainers resolves", %{conn: conn} do
+    for page <- [~p"/explained", ~p"/explained/dx", ~p"/explained/lab"] do
+      hrefs =
+        conn
+        |> get(page)
+        |> html_response(200)
+        |> LazyHTML.from_document()
+        |> LazyHTML.query("a[href^='/']")
+        |> LazyHTML.attribute("href")
+
+      for href <- Enum.uniq(hrefs) do
+        path = href |> String.split("#") |> hd()
+        assert build_conn() |> get(path) |> response(200), "#{page} links to #{href}"
+      end
+    end
+  end
+
   test "the home page links to the explainer", %{conn: conn} do
     link =
       conn

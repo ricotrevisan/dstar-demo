@@ -42,6 +42,7 @@ defmodule DstarDemoWeb.Snippets do
       # ...
       def handle_connect(conn, _params) do
         :ok = Inbox.subscribe()
+        :ok = Server.subscribe()
         patch_inbox(conn)
       end
       # ...

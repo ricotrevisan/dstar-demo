@@ -21,6 +21,7 @@ defmodule DstarDemoWeb.Router do
     pipe_through :browser
 
     dstar("/", HomePage)
+    dstar("/explained", ExplainedIndexPage)
     dstar("/explained/dx", ExplainedDxPage)
     dstar("/explained/lab", ExplainedLabPage)
     dstar("/examples", ExamplesPage)
@@ -36,6 +37,10 @@ defmodule DstarDemoWeb.Router do
     dstar("/presence", PresencePage)
 
     dstar_components("/ds", [ComponentStage])
+  end
+
+  scope "/", DstarDemoWeb do
+    get "/sitemap.xml", SitemapController, :index
   end
 
   # Other scopes may use custom stacks.
@@ -56,6 +61,14 @@ defmodule DstarDemoWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: DstarDemoWeb.Telemetry
+    end
+
+    # Renders the 1200×630 social cards in priv/static/images/og/.
+    # See DstarDemoWeb.OgCardPage for how to regenerate them.
+    scope "/dev", DstarDemoWeb do
+      pipe_through :browser
+
+      dstar("/og/:card", OgCardPage)
     end
   end
 end
