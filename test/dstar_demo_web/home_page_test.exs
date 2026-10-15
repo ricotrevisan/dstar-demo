@@ -15,7 +15,7 @@ defmodule DstarDemoWeb.HomePageTest do
     document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
 
     for n <- 1..5 do
-      step = LazyHTML.query(document, "#dx-stage-#{n}")
+      step = LazyHTML.query(document, "#dx-stage-#{n} [data-on-intersect__half]")
       assert LazyHTML.attribute(step, "data-on-intersect__half") == ["$stage = #{n}"]
     end
 
@@ -46,6 +46,26 @@ defmodule DstarDemoWeb.HomePageTest do
     for lane <- ~w(lv ds), counter <- ~w(auth procs memory) do
       assert document |> LazyHTML.query("##{lane}-#{counter}") |> Enum.count() == 1
     end
+  end
+
+  test "each stage's code is server-rendered twice: in the sticky code view and inline for phones",
+       %{conn: conn} do
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
+
+    for lane <- ~w(lv ds), n <- 1..5 do
+      block = LazyHTML.query(document, "#dx-code-#{lane}-#{n}")
+      assert LazyHTML.attribute(block, "data-show") == ["$stage == #{n}"]
+    end
+
+    for n <- 1..5 do
+      assert document |> LazyHTML.query("#dx-stage-#{n} details") |> Enum.count() == 1
+    end
+
+    # Stage 2 is the double-routing step: the LiveView lane hands the locale over.
+    stage2 = document |> LazyHTML.query("#dx-code-lv-2") |> LazyHTML.text()
+    assert stage2 =~ "put_session(conn, :locale, locale)"
+    assert stage2 =~ "def on_mount(:default, _params, session, socket)"
+    refute document |> LazyHTML.query("#dx-code-ds-2") |> LazyHTML.text() =~ "on_mount"
   end
 
   test "the pull request toggle shows both diffs with their file counts", %{conn: conn} do
