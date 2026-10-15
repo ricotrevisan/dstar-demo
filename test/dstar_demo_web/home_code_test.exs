@@ -10,7 +10,7 @@ defmodule DstarDemoWeb.HomeCodeTest do
 
   # Lines a later stage removes, so an earlier stage may add them.
   defp removed_after(n, lane) do
-    for later <- (n + 1)..5//1,
+    for later <- (n + 1)..6//1,
         {_file, diff} <- HomeCode.stage(later, lane),
         "-" <> line <- String.split(diff, "\n"),
         into: MapSet.new(),
@@ -21,7 +21,7 @@ defmodule DstarDemoWeb.HomeCodeTest do
     text |> String.split("\n") |> Enum.map(&String.trim/1) |> Enum.reject(&(&1 == ""))
   end
 
-  for lane <- [:lv, :ds], n <- 1..5 do
+  for lane <- [:lv, :ds], n <- 1..6 do
     @lane lane
     @n n
 
@@ -54,7 +54,7 @@ defmodule DstarDemoWeb.HomeCodeTest do
 
   test "every finished file is touched by some stage" do
     for lane <- [:lv, :ds] do
-      touched = for n <- 1..5, {file, _} <- HomeCode.stage(n, lane), into: MapSet.new(), do: file
+      touched = for n <- 1..6, {file, _} <- HomeCode.stage(n, lane), into: MapSet.new(), do: file
 
       for {file, _code} <- HomeCode.files(lane) do
         assert file in touched, "#{lane}: no stage introduces #{file}"
@@ -63,7 +63,7 @@ defmodule DstarDemoWeb.HomeCodeTest do
   end
 
   test "a deploy needs no code in either model" do
-    assert HomeCode.stage(5, :lv) == []
-    assert HomeCode.stage(5, :ds) == []
+    assert HomeCode.stage(6, :lv) == []
+    assert HomeCode.stage(6, :ds) == []
   end
 end

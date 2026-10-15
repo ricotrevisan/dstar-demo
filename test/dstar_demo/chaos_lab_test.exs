@@ -3,13 +3,13 @@ defmodule DstarDemo.ChaosLabTest do
 
   alias DstarDemo.ChaosLab
 
-  test "opening six tabs: LiveView mounts twice per tab, Dstar once, and only LiveView holds copies" do
+  test "opening six tabs: LiveView mounts twice per tab, Dstar once, and only LiveView holds page processes" do
     lab = ChaosLab.new()
 
     assert lab.lv.mounts == 12
     assert lab.ds.mounts == 6
-    assert lab.lv.copies == 6
-    assert lab.ds.copies == 0
+    assert lab.lv.procs == 6
+    assert lab.ds.procs == 0
   end
 
   test "deploy remounts every LiveView tab and re-authorizes every Dstar stream without mounting" do
@@ -48,7 +48,20 @@ defmodule DstarDemo.ChaosLabTest do
       assert tab.ds == :out
     end
 
-    assert lab.lv.copies == 4
+    assert lab.lv.procs == 4
     assert ChaosLab.apply_action(lab, "revoke") == lab
+  end
+
+  test "a double click: LiveView handles both events in order, Dstar runs two handlers" do
+    lab = ChaosLab.new()
+    after_double = ChaosLab.apply_action(lab, "double")
+
+    # Idempotent mark_read: the count drops by one in both worlds.
+    assert after_double.lv.db == lab.lv.db - 1
+    assert after_double.ds.db == lab.ds.db - 1
+    # Two requests through the plugs for Dstar; the socket checks nothing new.
+    assert after_double.ds.auth == lab.ds.auth + 2
+    assert after_double.lv.auth == lab.lv.auth
+    assert hd(after_double.log).title =~ "double-clicked"
   end
 end

@@ -14,7 +14,7 @@ defmodule DstarDemoWeb.ExplainedLabPage do
   alias DstarDemo.ChaosLab
   alias DstarDemo.ChaosLab.Server
 
-  @actions ~w(click deploy tunnel revoke reset)
+  @actions ~w(click double deploy tunnel revoke reset)
 
   @impl Dstar.Page
   def mount(conn, _params) do
@@ -111,9 +111,10 @@ defmodule DstarDemoWeb.ExplainedLabPage do
             request, so its number climbs faster. That's the point: there's one path, and it's
             always walked.
           </.explain>
-          <.explain term="copies in memory">
-            Page state held on the server between events. One per live LiveView tab. Zero for
-            Dstar, which re-reads the database instead.
+          <.explain term="page processes">
+            LiveView processes holding a tab's state between events, one per live tab. That
+            process is a cost, and it's also what handles a tab's events in order and navigates
+            without a new request. Zero for Dstar, which re-reads the database instead.
           </.explain>
           <.explain term="open connections">
             WebSockets or SSE streams. They're equal here on purpose: both pages have a live
@@ -125,7 +126,7 @@ defmodule DstarDemoWeb.ExplainedLabPage do
           models</strong>: a connection that's already open was authorized when it opened.
           Second, <strong>real-time costs the same</strong>
           in both: one PubSub message per open tab. What differs is what each tab does with it.
-          A LiveView process updates its copy, and a Dstar stream re-reads the truth.
+          A LiveView process updates its assigns, and a Dstar stream re-reads the truth.
         </.para>
       </section>
 
@@ -179,6 +180,12 @@ defmodule DstarDemoWeb.ExplainedLabPage do
           icon="hero-cursor-arrow-rays-micro"
           label="A tab clicks"
           primary
+        />
+        <.lab_button
+          id="lab-double"
+          action="double"
+          icon="hero-cursor-arrow-ripple-micro"
+          label="Ada double-clicks"
         />
         <.lab_button id="lab-deploy" action="deploy" icon="hero-rocket-launch-micro" label="Deploy" />
         <.lab_button
@@ -288,14 +295,14 @@ defmodule DstarDemoWeb.ExplainedLabPage do
             <.icon name="hero-server-micro" class="size-3.5 opacity-60" /> server memory
           </span>
           <span class="font-mono font-normal text-base-content/65">
-            {@counters.copies} {if(@counters.copies == 1, do: "copy", else: "copies")} of page state
+            {@counters.procs} page {if(@counters.procs == 1, do: "process", else: "processes")}
           </span>
         </p>
         <div class="mt-2 flex h-4 gap-1">
-          <span :for={_ <- List.duplicate(nil, @counters.copies)} class="w-4 bg-base-content/40">
+          <span :for={_ <- List.duplicate(nil, @counters.procs)} class="w-4 bg-base-content/40">
           </span>
-          <span :if={@counters.copies == 0} class="font-mono text-[10px] text-base-content/60">
-            nothing held, the database is the copy
+          <span :if={@counters.procs == 0} class="font-mono text-[10px] text-base-content/60">
+            no page process, the database holds the state
           </span>
         </div>
       </div>
@@ -470,7 +477,7 @@ defmodule DstarDemoWeb.ExplainedLabPage do
           tone="neutral"
           items={[
             "**Fanning one update out to every tab.** LiveView sends a diff; each Dstar stream renders HTML. LiveView uses 11–20% less CPU and sends about 16% fewer bytes per tab.",
-            "**Holding a live tab open costs the same.** About 24 KB per tab either way. The open connection is the cost, not LiveView's copy, which streams keep small."
+            "**Holding a live tab open costs the same.** About 24 KB per tab either way. The open connection is the cost, not LiveView's assigns, which streams keep small."
           ]}
         />
       </div>

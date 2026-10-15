@@ -32,6 +32,7 @@ defmodule DstarDemoWeb.HomeCode do
            MyAppWeb.Unread
          ] do
          live "/inbox", InboxLive
+         live "/inbox/:id", MessageLive
          # ...every page with the sidebar lives in this live_session
        end
      end
@@ -131,6 +132,29 @@ defmodule DstarDemoWeb.HomeCode do
      def handle_info({:inbox_changed, message}, socket) do
        {:noreply, stream_insert(socket, :messages, message)}
      end
+
+     defp message_row(assigns) do
+       ~H"""
+       <li id={@id}>
+         <.link navigate={~p"/inbox/#{@message.id}"}>{@message.subject}</.link>
+         <button phx-click="read" phx-value-id={@message.id}>Mark read</button>
+       </li>
+       """
+     end
+     '''},
+    {"message_live.ex",
+     ~S'''
+     def mount(%{"id" => id}, _session, socket) do
+       {:ok, assign(socket, :message, Inbox.get!(socket.assigns.current_scope, id))}
+     end
+
+     def render(assigns) do
+       ~H"""
+       <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread}>
+         <article>{@message.body}</article>
+       </Layouts.app>
+       """
+     end
      '''}
   ]
 
@@ -150,6 +174,7 @@ defmodule DstarDemoWeb.HomeCode do
        pipe_through [:browser, :require_authenticated_user, :unread]
 
        dstar "/inbox", InboxPage
+       dstar "/inbox/:id", MessagePage
      end
      '''},
     {"locale.ex",
@@ -247,6 +272,29 @@ defmodule DstarDemoWeb.HomeCode do
      # Nothing keeps the badge fresh for you: whatever changes it, patches it.
      defp patch_unread(conn) do
        patch(conn, &Layouts.unread_badge/1, unread: Inbox.unread_count(conn.assigns.current_scope))
+     end
+
+     defp message_row(assigns) do
+       ~H"""
+       <li id={"message-#{@message.id}"}>
+         <a href={~p"/inbox/#{@message.id}"}>{@message.subject}</a>
+         <button data-on:click={event("read:#{@message.id}")}>Mark read</button>
+       </li>
+       """
+     end
+     '''},
+    {"message_page.ex",
+     ~S'''
+     def mount(conn, %{"id" => id}) do
+       assign(conn, :message, Inbox.get!(conn.assigns.current_scope, id))
+     end
+
+     def render(assigns) do
+       ~H"""
+       <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread}>
+         <article>{@message.body}</article>
+       </Layouts.app>
+       """
      end
      '''}
   ]
@@ -458,8 +506,62 @@ defmodule DstarDemoWeb.HomeCode do
        +end
        '''}
     ],
-    {5, :lv} => [],
-    {5, :ds} => []
+    {5, :lv} => [
+      {"router.ex",
+       ~S'''
+            live "/inbox", InboxLive
+       +    live "/inbox/:id", MessageLive
+       '''},
+      {"inbox_live.ex",
+       ~S'''
+        <li id={@id}>
+       -  {@message.subject}
+       +  <.link navigate={~p"/inbox/#{@message.id}"}>{@message.subject}</.link>
+       '''},
+      {"message_live.ex",
+       ~S'''
+       +def mount(%{"id" => id}, _session, socket) do
+       +  {:ok, assign(socket, :message, Inbox.get!(socket.assigns.current_scope, id))}
+       +end
+       +
+       +def render(assigns) do
+       +  ~H"""
+       +  <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread}>
+       +    <article>{@message.body}</article>
+       +  </Layouts.app>
+       +  """
+       +end
+       '''}
+    ],
+    {5, :ds} => [
+      {"router.ex",
+       ~S'''
+          dstar "/inbox", InboxPage
+       +  dstar "/inbox/:id", MessagePage
+       '''},
+      {"inbox_page.ex",
+       ~S'''
+        <li id={"message-#{@message.id}"}>
+       -  {@message.subject}
+       +  <a href={~p"/inbox/#{@message.id}"}>{@message.subject}</a>
+       '''},
+      {"message_page.ex",
+       ~S'''
+       +def mount(conn, %{"id" => id}) do
+       +  assign(conn, :message, Inbox.get!(conn.assigns.current_scope, id))
+       +end
+       +
+       +def render(assigns) do
+       +  ~H"""
+       +  <Layouts.app flash={@flash} current_scope={@current_scope} unread={@unread}>
+       +    <article>{@message.body}</article>
+       +  </Layouts.app>
+       +  """
+       +end
+       '''}
+    ],
+    {6, :lv} => [],
+    {6, :ds} => []
   }
 
   # ── A year later, as a pull request ───────────────────────────────────

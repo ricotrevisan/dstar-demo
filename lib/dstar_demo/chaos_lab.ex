@@ -9,7 +9,7 @@ defmodule DstarDemo.ChaosLab do
 
     * `mounts` — `mount/3` (LiveView) or `mount/2` (Dstar) executions
     * `auth`   — places a session was checked: router plugs, or `on_mount`
-    * `copies` — copies of page state held in server memory between events
+    * `procs`  — page processes holding a tab's state between events
     * `conns`  — open WebSockets (LiveView) or open SSE streams (Dstar)
     * `msgs`   — process-to-process messages (PubSub fan-out, send_update…)
 
@@ -20,6 +20,7 @@ defmodule DstarDemo.ChaosLab do
 
   @users ~w(Ada Ada Ben Cy Dee Eve)
   @tunnel_tab 4
+  @double_tab 1
   @refill 9
 
   @type world :: :lv | :ds
@@ -47,14 +48,14 @@ defmodule DstarDemo.ChaosLab do
       # Opening the page, per tab — LiveView: GET (plugs + mount), then the
       # socket connects (on_mount + mount again). Dstar: GET (plugs + mount),
       # then data-init's connect() POST (plugs, handle_connect, no mount).
-      lv: %{db: @refill, mounts: 2 * n, auth: 2 * n, copies: n, conns: n, msgs: 0},
-      ds: %{db: @refill, mounts: n, auth: 2 * n, copies: 0, conns: n, msgs: 0},
+      lv: %{db: @refill, mounts: 2 * n, auth: 2 * n, procs: n, conns: n, msgs: 0},
+      ds: %{db: @refill, mounts: n, auth: 2 * n, procs: 0, conns: n, msgs: 0},
       log: [
         entry(0, "Six tabs opened the inbox",
           lv:
-            "Each tab: one HTTP render, then a socket and a second mount/3. Six processes now hold a copy of the page.",
+            "Each tab: one HTTP render, then a socket and a second mount/3. Six page processes are now running, one per tab.",
           ds:
-            "Each tab: one HTTP render, then a connect() POST through the same plugs. handle_connect/2 runs, mount/2 does not. Nothing is copied."
+            "Each tab: one HTTP render, then a connect() POST through the same plugs. handle_connect/2 runs, mount/2 does not. No page process is held."
         )
       ],
       seq: 0,
@@ -87,7 +88,7 @@ defmodule DstarDemo.ChaosLab do
     |> refresh_badges(:ds, ds_live)
     |> log("Someone deployed",
       lv:
-        "All #{nl} sockets dropped. All #{nl} reconnected at once: #{nl} on_mount checks, #{nl} more mount/3 calls, #{nl} copies rebuilt from the database.",
+        "All #{nl} sockets dropped. All #{nl} reconnected at once: #{nl} on_mount checks, #{nl} more mount/3 calls, #{nl} processes rebuilt their assigns from the database.",
       ds:
         "All #{nd} streams dropped. All #{nd} re-POSTed connect() through the router plugs. handle_connect/2 re-read the badge, and mount/2 did not run. Pages without a stream wouldn't have noticed."
     )
@@ -114,7 +115,7 @@ defmodule DstarDemo.ChaosLab do
       state
       |> set_status(:lv, lv_hit, :out)
       |> set_status(:ds, ds_hit, :out)
-      |> bump(:lv, auth: nl, copies: -nl, conns: -nl, msgs: 1)
+      |> bump(:lv, auth: nl, procs: -nl, conns: -nl, msgs: 1)
       |> bump(:ds, auth: nd, conns: -nd, msgs: 1)
       |> log("Ada's session was revoked from another device",
         lv:
@@ -123,6 +124,35 @@ defmodule DstarDemo.ChaosLab do
           "Ada's next click would fail the plugs. Ada's #{nd} open streams were authorized when they opened, so they are told to stop too: a broadcast to Ada's user topic, then handle_info returns {:halt, conn}. The reconnect is refused by the same plugs."
       )
       |> flash(lv_hit, ds_hit)
+    end
+  end
+
+  def apply_action(state, "double") do
+    tab = Enum.find(state.tabs, &(&1.id == @double_tab))
+
+    if tab.lv == :live and tab.ds == :live do
+      lv_others = ids(state, :lv, :live) -- [tab.id]
+      ds_others = ids(state, :ds, :live) -- [tab.id]
+
+      state
+      |> mark_read(:lv)
+      |> mark_read(:ds)
+      |> bump(:lv, msgs: length(lv_others))
+      |> bump(:ds, auth: 2, msgs: 2 * length(ds_others))
+      |> refresh_badges(:lv, [tab.id | lv_others])
+      |> refresh_badges(:ds, [tab.id | ds_others])
+      |> log("#{tab.user} (tab #{tab.id}) double-clicked Mark read",
+        lv:
+          "Two events ride the socket into one process, which handles them one at a time, in order. The first marks the message read; the second finds it already read and does nothing.",
+        ds:
+          "Two POSTs, both through the plugs. Datastar cancels the first response in the browser, but the server already ran it: two handlers, in two processes, at the same time. Inbox.mark_read/2 is idempotent, so the badge drops by one. A handler like \"add one\" would have run twice."
+      )
+      |> flash([tab.id], [tab.id])
+    else
+      log(state, "#{tab.user} (tab #{tab.id}) can't double-click right now",
+        lv: "That tab isn't connected. Press Reset.",
+        ds: "That tab isn't live. Press Reset."
+      )
     end
   end
 
@@ -187,13 +217,13 @@ defmodule DstarDemo.ChaosLab do
     state
     |> set_status(:lv, [tab.id], :offline)
     |> set_status(:ds, [tab.id], :offline)
-    |> bump(:lv, copies: -1, conns: -1)
+    |> bump(:lv, procs: -1, conns: -1)
     |> bump(:ds, conns: -1)
     |> log("#{tab.user} (tab #{tab.id}) went into a tunnel",
       lv:
-        "The socket drops. When the heartbeat gives up, the process and its copy of the page go with it.",
+        "The socket drops. When the heartbeat gives up, the process and its assigns go with it.",
       ds:
-        "The stream drops. There was no copy to lose. The badge stays as it was until the tab is back."
+        "The stream drops. There was no process to lose. The badge stays as it was until the tab is back."
     )
     |> flash([tab.id], [tab.id])
   end
@@ -205,7 +235,7 @@ defmodule DstarDemo.ChaosLab do
       state
       |> set_status(:lv, [tab.id], :live)
       |> set_status(:ds, [tab.id], :live)
-      |> bump(:lv, auth: 1, mounts: 1, copies: 1, conns: 1)
+      |> bump(:lv, auth: 1, mounts: 1, procs: 1, conns: 1)
       |> bump(:ds, auth: 1 + pending, conns: 1)
       |> update_tab(tab.id, &%{&1 | pending: 0})
 
@@ -225,7 +255,7 @@ defmodule DstarDemo.ChaosLab do
     state
     |> log("#{tab.user} (tab #{tab.id}) came out of the tunnel",
       lv:
-        "The socket rejoins. A new process runs on_mount and mount/3 again and rebuilds the copy from scratch.",
+        "The socket rejoins. A new process runs on_mount and mount/3 again and rebuilds its assigns from scratch.",
       ds:
         "connect() re-POSTs through the plugs, and handle_connect/2 re-reads the badge." <>
           retried

@@ -9,7 +9,7 @@ defmodule DstarDemoWeb.HomePage do
   a function component rendered inside the LiveView, and the layout's badge
   comes from an `on_mount` hook with `attach_hook/4`. The diagram is SVG whose
   groups are shown by the `stage` signal; the inbox at the bottom is real
-  Dstar backed by `DstarDemo.Inbox`, and the stage-5 deploy button drives the
+  Dstar backed by `DstarDemo.Inbox`, and the stage-6 deploy button drives the
   same `DstarDemo.ChaosLab.Server` as `/explained/lab`.
   """
   use DstarDemoWeb, :dstar_page
@@ -25,7 +25,8 @@ defmodule DstarDemoWeb.HomePage do
     {2, "Your plugs, twice"},
     {3, "The sidebar wants to know"},
     {4, "Other tabs want to know"},
-    {5, "Then you deploy"}
+    {5, "A second page"},
+    {6, "Then you deploy"}
   ]
 
   @impl Dstar.Page
@@ -145,7 +146,7 @@ defmodule DstarDemoWeb.HomePage do
         <p>
           To see what that's worth, this post builds the same inbox both ways, with LiveView
           written the way Phoenix 1.8 recommends, and follows the arrows as it grows: a login, a
-          badge in the layout, other tabs, a deploy. Both can build it. The question is what
+          badge in the layout, other tabs, a second page, a deploy. Both can build it. The question is what
           staying connected costs along the way, and whether you pay it on every page or only
           where you need it.
         </p>
@@ -188,7 +189,8 @@ defmodule DstarDemoWeb.HomePage do
                 for the HTTP render, and an <code>on_mount</code>
                 hook on the <code>live_session</code>
                 for the socket, which never runs the router pipeline. That's the documented
-                pattern, and it's sound.
+                pattern, and it's sound. It's also what pays for cheap navigation, as stage 5
+                shows: the socket is a second way in on purpose.
               </p>
               <p>
                 Then you add a plug of your own, say the reader's language from <code>Accept-Language</code>. It sets the Gettext locale for the HTTP render. But the LiveView is
@@ -200,11 +202,21 @@ defmodule DstarDemoWeb.HomePage do
                 default as soon as the socket connects.
               </p>
               <p>
+                Good teams keep each rule in one module that the plug and the hook both call, so
+                the logic is written once. What's left is two places to wire every new plug, and
+                remembering that the second one exists.
+              </p>
+              <p>
                 <strong>Dstar:</strong>
                 the same plug, once. The GET, every click and every stream are requests through
                 it, each in its own process, so the locale holds for whatever that request
-                renders. Page-specific rules ("is this my message?") go in <code>authorize/2</code>,
-                which runs before every event.
+                renders.
+              </p>
+              <p>
+                <strong>Both:</strong>
+                any client can send any event, so "is this my message?" gets checked on every
+                event either way. In Dstar that check can live in <code>authorize/2</code>; in
+                LiveView it lives in <code>handle_event/3</code>. That part is parity.
               </p>
               <:extra><.inline_code n={2} /></:extra>
             </.step>
@@ -256,7 +268,33 @@ defmodule DstarDemoWeb.HomePage do
               </p>
               <:extra><.inline_code n={4} /></:extra>
             </.step>
-            <.step n={5} title="Then you deploy" signal="stage" id_prefix="dx-stage">
+            <.step n={5} title="A second page" signal="stage" id_prefix="dx-stage">
+              <p>Real apps are many pages. Click a message to open it.</p>
+              <p>
+                <strong>LiveView:</strong>
+                <code>{"<.link navigate={…}>"}</code>. Inside the <code>live_session</code>,
+                navigation stays on the open socket: no HTTP request, no plug pipeline, no layout
+                to download. <code>MessageLive</code>
+                mounts in a new process, and the <code>on_mount</code>
+                hooks run (auth, the locale, the badge). This is what the second way in from stage
+                2 buys, and it's a real win: moving around the app skips the pipeline.
+              </p>
+              <p>
+                <strong>Dstar:</strong>
+                a plain <code>{"<a href={…}>"}</code>. The browser does a full GET: the router,
+                every plug, <code>mount/2</code>
+                and the whole page, layout included. Assets come from the cache, and
+                cross-document View Transitions can make the swap smooth, but the server does the
+                full render on every hop. If the old page had a stream, it closes, and the new page
+                opens its own only if it needs one.
+              </p>
+              <p>
+                We haven't benchmarked navigation yet, so there's no number here. Per hop,
+                LiveView does less work.
+              </p>
+              <:extra><.inline_code n={5} /></:extra>
+            </.step>
+            <.step n={6} title="Then you deploy" signal="stage" id_prefix="dx-stage">
               <p>
                 <strong>LiveView:</strong>
                 every socket drops. Each tab rejoins, runs its <code>on_mount</code>
@@ -272,7 +310,7 @@ defmodule DstarDemoWeb.HomePage do
                 mid-deploy is just a request, and Datastar retries it until a server answers.
               </p>
               <.deploy_demo lab={@lab} />
-              <:extra><.inline_code n={5} /></:extra>
+              <:extra><.inline_code n={6} /></:extra>
             </.step>
           </div>
 
@@ -288,8 +326,8 @@ defmodule DstarDemoWeb.HomePage do
         <div class="max-w-[68ch]">
           <.section_heading>The finished inbox, as code</.section_heading>
           <.para>
-            All five stages stacked: login, the locale plug, a layout badge and live tabs,
-            written both ways. These are illustrative excerpts on top of <code>phx.gen.auth</code>, which generates the same
+            All six stages stacked: login, the locale plug, a layout badge, live tabs and a
+            second page, written both ways. These are illustrative excerpts on top of <code>phx.gen.auth</code>, which generates the same
             <code>user_auth.ex</code>
             for both apps, so it isn't counted. Neither is the <code>Inbox</code>
             context, which is the same in both.
@@ -334,6 +372,49 @@ defmodule DstarDemoWeb.HomePage do
           ~p"/explained/lab#benchmark"
         }>lab's benchmark</.inline_link>.
       </aside>
+
+      <section id="process" class="mx-auto mt-24 max-w-[860px]">
+        <div class="max-w-[68ch]">
+          <.section_heading>What the process buys</.section_heading>
+          <.para>
+            The diagram counts LiveView's process as a cost, and it is one: memory and a socket
+            for every open tab. But it also pays for several of the arrows, and some of them
+            Dstar doesn't have. Here's what you get for it, and Dstar's answer to each.
+          </.para>
+        </div>
+        <div class="mt-6 overflow-x-auto">
+          <table class="w-full min-w-[640px] border border-base-300 text-left text-sm leading-6">
+            <thead class="bg-base-200 text-xs">
+              <tr>
+                <th class="w-[18%] px-4 py-2.5 font-medium text-base-content/70"></th>
+                <th class="px-4 py-2.5 font-semibold">
+                  <span class="inline-flex items-center gap-2">
+                    <.swatch tone="neutral" /> LiveView's process
+                  </span>
+                </th>
+                <th class="px-4 py-2.5 font-semibold">
+                  <span class="inline-flex items-center gap-2"><.swatch tone="primary" /> Dstar</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-base-300 align-top">
+              <tr
+                :for={{row, lv, ds} <- process_rows()}
+                id={"process-#{row |> String.downcase() |> String.replace(" ", "-")}"}
+              >
+                <th class="px-4 py-3 font-medium">{row}</th>
+                <td class="px-4 py-3 text-base-content/80"><.rich_text text={lv} /></td>
+                <td class="px-4 py-3 text-base-content/80"><.rich_text text={ds} /></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <.para>
+          Event order is the one to read twice. A Dstar handler can run twice, or alongside
+          another one, so it should be safe to repeat: "mark read" is, "add one" isn't. You can
+          watch the difference in <.inline_link href={~p"/explained/lab"}>the lab</.inline_link>: press "Ada double-clicks".
+        </.para>
+      </section>
 
       <section id="payoff" class="mx-auto mt-24 max-w-[860px]">
         <div class="max-w-[68ch]">
@@ -472,6 +553,8 @@ defmodule DstarDemoWeb.HomePage do
             tone="neutral"
             items={[
               "**Every page should be live.** One hook on the live_session reaches every LiveView. There's no stream to open page by page.",
+              "**Users move around a lot.** Navigation inside a live_session stays on the socket: no HTTP render and no plug pipeline per hop.",
+              "**Order matters.** One process handles a tab's events one at a time, in order. Dstar's handlers can overlap and must be safe to repeat.",
               "**Updates are tiny and constant.** A diff on an open socket is smaller and faster than an HTTP round trip that returns HTML.",
               "**The state really belongs to the connection.** Presence, uploads and long wizards fit a process that lives as long as the tab.",
               "**You want the mature path.** LiveViewTest, JS commands, streams and years of answers on the forum."
@@ -503,6 +586,31 @@ defmodule DstarDemoWeb.HomePage do
     <%!-- After the content, so crawlers and unfurlers read the H1 first. --%>
     <Layouts.flash_group flash={@flash} />
     """
+  end
+
+  # {row, LiveView, Dstar} for "What the process buys". Each claim was
+  # checked against LiveView 1.1 and the vendored Datastar 1.0.1.
+  defp process_rows do
+    [
+      {"Navigation",
+       "**Over the open socket.** Inside a live_session, a new LiveView mounts with no HTTP request and no plug pipeline. Its on_mount hooks still run.",
+       "**A full GET.** Router, plugs, mount/2 and the whole page. Assets are cached, and View Transitions can make it smooth, but the server renders every hop."},
+      {"Event order",
+       "**One at a time, in order.** A tab's events queue in its process, so a double click is two events, handled one after the other.",
+       "**No ordering.** Each click is its own request and process. Datastar cancels the previous response from the same element, but the server may already have run it, and retries make delivery at-least-once."},
+      {"State between events",
+       "**In the process, out of the client's reach.** Assigns hold anything you like, trusted, until the tab closes.",
+       "**In the database or the session.** Signals come from the browser, so they're input, not state. A multi-step form needs somewhere to keep its draft."},
+      {"Updates",
+       "**Diffs.** Only the changed dynamic parts go over the socket. Compression is off unless you set compress: true on the socket.",
+       "**HTML patches.** The changed element, whole. Bandit compresses responses and streams by default. We haven't benchmarked compressed bytes yet."},
+      {"Form recovery",
+       "**Automatic.** After a reconnect, forms with phx-change are replayed into the new process.",
+       "**Mostly not needed.** A deploy doesn't reload the page, so inputs stay in the DOM. But nothing on the server knows about a half-filled form."},
+      {"Cost",
+       "**A process and a socket per open tab,** about the same memory as one Dstar stream.",
+       "**Nothing per tab,** until a page opens a stream."}
+    ]
   end
 
   @doc false
@@ -766,8 +874,11 @@ defmodule DstarDemoWeb.HomePage do
     <div id="dx-diagram">
       <div class="flex items-center justify-between gap-3">
         <p class="text-sm font-semibold">
-          <span class="font-mono text-xs text-base-content/60" data-text="'Stage ' + $stage + ' / 5'">
-            Stage 1 / 5
+          <span
+            class="font-mono text-xs text-base-content/60"
+            data-text={"'Stage ' + $stage + ' / #{length(@stages)}'"}
+          >
+            Stage 1 / {length(@stages)}
           </span>
           <span
             class="ml-2"
@@ -819,6 +930,7 @@ defmodule DstarDemoWeb.HomePage do
           <:tally>
             <.tally id="lv-auth" label="ways in" expr="2" initial="2" />
             <.tally id="lv-procs" label="processes per tab" expr="2" initial="2" />
+            <.tally id="lv-nav" label="navigation" expr="'over the socket'" initial="over the socket" />
             <.tally
               id="lv-memory"
               label="memory per tab"
@@ -829,7 +941,15 @@ defmodule DstarDemoWeb.HomePage do
           <svg viewBox="0 0 360 206" class="w-full" role="img" aria-label="LiveView architecture">
             <.svg_defs id="lv" />
             <.box x={8} y={78} w={64} label="Browser" />
-            <.box x={118} y={16} w={92} label="router plugs" sub="HTTP only" hot="$stage == 2" />
+            <.box
+              x={118}
+              y={16}
+              w={92}
+              label="router plugs"
+              sub="HTTP only"
+              sub_expr="$stage == 5 ? 'skipped' : 'HTTP only'"
+              hot="$stage == 2"
+            />
             <%!-- socket path: straight in until on_mount exists --%>
             <g data-show="$stage == 1">
               <path
@@ -847,22 +967,25 @@ defmodule DstarDemoWeb.HomePage do
                 label="on_mount"
                 sub="plugs, again"
                 sub_expr="$stage >= 3 ? 'plugs + @unread' : 'plugs, again'"
-                hot="$stage == 2 || $stage == 3"
+                hot="$stage == 2 || $stage == 3 || $stage == 5"
               />
               <path
                 d="M72 104 L 118 134"
                 class="dx-wire dx-wire-hot"
-                data-class="{'dx-wire-bad': $stage == 5}"
+                data-class="{'dx-wire-bad': $stage == 6}"
                 marker-end="url(#lv-head)"
               />
               <path
                 d="M210 136 L 244 126"
                 class="dx-wire dx-wire-hot"
-                data-class="{'dx-wire-bad': $stage == 5}"
+                data-class="{'dx-wire-bad': $stage == 6}"
                 marker-end="url(#lv-head)"
               />
-              <text x="64" y="150" class="dx-sub" data-show="$stage == 5" style="display: none">
+              <text x="64" y="150" class="dx-sub" data-show="$stage == 6" style="display: none">
                 rejoin!
+              </text>
+              <text x="60" y="150" class="dx-sub" data-show="$stage == 5" style="display: none">
+                navigate
               </text>
             </g>
             <%!-- HTTP path --%>
@@ -883,9 +1006,10 @@ defmodule DstarDemoWeb.HomePage do
               y={60}
               w={92}
               label="InboxLive"
+              label_expr="$stage == 5 ? 'MessageLive' : 'InboxLive'"
               sub="mount/3 ×2"
-              sub_expr="$stage == 5 ? 'mount/3 again' : 'mount/3 ×2'"
-              hot="$stage == 1 || $stage == 5"
+              sub_expr="$stage == 6 ? 'mount/3 again' : $stage == 5 ? 'mount/3, socket' : 'mount/3 ×2'"
+              hot="$stage == 1 || $stage == 5 || $stage == 6"
             />
             <g data-show="$stage >= 3" style="display: none" class="dx-enter">
               <.box x={252} y={104} w={92} label="Layouts.app" sub="@unread badge" hot="$stage == 3" />
@@ -905,11 +1029,17 @@ defmodule DstarDemoWeb.HomePage do
         <.panel name="Dstar" tone="primary" lane="ds">
           <:tally>
             <.tally id="ds-auth" label="ways in" expr="1" initial="1" />
-            <.tally id="ds-procs" label="processes per tab" expr="$stage >= 4 ? 1 : 0" initial="0" />
+            <.tally
+              id="ds-procs"
+              label="processes per tab"
+              expr="$stage == 4 || $stage == 6 ? 1 : 0"
+              initial="0"
+            />
+            <.tally id="ds-nav" label="navigation" expr="'full GET'" initial="full GET" />
             <.tally
               id="ds-memory"
               label="memory per tab"
-              expr={"$stage >= 4 ? '#{@bench.ds} KB' : '≈ 0 KB'"}
+              expr={"$stage == 4 || $stage == 6 ? '#{@bench.ds} KB' : '≈ 0 KB'"}
               initial="≈ 0 KB"
             />
           </:tally>
@@ -930,12 +1060,21 @@ defmodule DstarDemoWeb.HomePage do
               w={114}
               label="router plugs"
               sub="GET · events · streams"
-              hot="$stage == 2 || $stage == 5"
+              hot="$stage == 2 || $stage == 5 || $stage == 6"
             />
             <path d="M80 92 L 130 94" class="dx-wire" marker-end="url(#ds-head)" />
-            <text x="86" y="84" class="dx-sub">POST</text>
+            <text x="86" y="84" class="dx-sub" data-text="$stage == 5 ? 'GET' : 'POST'">POST</text>
             <path d="M244 94 L 262 72" class="dx-wire" marker-end="url(#ds-head)" />
-            <.box x={262} y={50} w={90} label="InboxPage" sub="handle_event/3" hot="$stage == 3" />
+            <.box
+              x={262}
+              y={50}
+              w={90}
+              label="InboxPage"
+              label_expr="$stage == 5 ? 'MessagePage' : 'InboxPage'"
+              sub="handle_event/3"
+              sub_expr="$stage == 5 ? 'mount/2, GET' : 'handle_event/3'"
+              hot="$stage == 3 || $stage == 5"
+            />
 
             <%!-- every click is answered with patches; the badge joins at stage 3 --%>
             <path
@@ -948,7 +1087,7 @@ defmodule DstarDemoWeb.HomePage do
               x="140"
               y="34"
               class="dx-sub"
-              data-text="$stage >= 3 ? 'SSE: #list + #sidebar' : 'SSE: #list'"
+              data-text="$stage == 5 ? 'HTML: the whole page' : $stage >= 3 ? 'SSE: #list + #sidebar' : 'SSE: #list'"
             >
               SSE: #list
             </text>
@@ -957,34 +1096,37 @@ defmodule DstarDemoWeb.HomePage do
               <path
                 d="M80 130 C 120 150, 150 140, 176 112"
                 class="dx-wire dx-wire-hot"
-                data-class="{'dx-wire-bad': $stage == 5}"
+                data-class="{'dx-wire-bad': $stage == 5 || $stage == 6}"
                 marker-end="url(#ds-head)"
               />
               <text
                 x="88"
                 y="158"
                 class="dx-sub"
-                data-text="$stage == 5 ? 'connect() again' : 'connect() stream'"
+                data-text="$stage == 6 ? 'connect() again' : $stage == 5 ? 'closes with the page' : 'connect() stream'"
               >
                 connect() stream
               </text>
-              <rect x="254" y="142" width="104" height="50" class="dx-proc" />
-              <text x="258" y="204" class="dx-sub">1 process / tab</text>
-              <.box
-                x={262}
-                y={150}
-                w={88}
-                label="the stream"
-                sub="handle_info/2"
-                hot="$stage == 4 || $stage == 5"
-              />
-              <path d="M306 150 L 306 100" class="dx-wire dx-wire-hot" marker-end="url(#ds-head)" />
+              <%!-- the message page opens no stream of its own --%>
+              <g data-show="$stage != 5">
+                <rect x="254" y="142" width="104" height="50" class="dx-proc" />
+                <text x="258" y="204" class="dx-sub">1 process / tab</text>
+                <.box
+                  x={262}
+                  y={150}
+                  w={88}
+                  label="the stream"
+                  sub="handle_info/2"
+                  hot="$stage == 4 || $stage == 6"
+                />
+                <path d="M306 150 L 306 100" class="dx-wire dx-wire-hot" marker-end="url(#ds-head)" />
+              </g>
             </g>
           </svg>
         </.panel>
 
         <p class="mt-3 text-[11px] leading-4 text-base-content/60 max-lg:hidden">
-          Processes and memory per open tab: measured medians from the benchmark, {@bench.tabs} tabs. A Dstar page without a stream holds neither.
+          Processes and memory per open tab: measured medians from the benchmark, {@bench.tabs} tabs. A Dstar page without a stream holds neither, like the message page at stage 5. Navigation isn't benchmarked yet.
         </p>
       </div>
     </div>
@@ -1031,6 +1173,7 @@ defmodule DstarDemoWeb.HomePage do
   attr :label, :string, required: true
   attr :sub, :string, default: nil
   attr :sub_expr, :string, default: nil, doc: "Datastar expression that replaces `sub`"
+  attr :label_expr, :string, default: nil, doc: "Datastar expression that replaces `label`"
   attr :hot, :string, default: "false"
 
   defp box(assigns) do
@@ -1044,7 +1187,7 @@ defmodule DstarDemoWeb.HomePage do
         class="dx-box"
         data-class={"{'dx-box-hot': #{@hot}}"}
       />
-      <text x={@x + 7} y={@y + 15} class="dx-text">{@label}</text>
+      <text x={@x + 7} y={@y + 15} class="dx-text" data-text={@label_expr}>{@label}</text>
       <text :if={@sub} x={@x + 7} y={@y + 27} class="dx-sub" data-text={@sub_expr}>{@sub}</text>
     </g>
     """

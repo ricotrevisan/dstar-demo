@@ -93,7 +93,7 @@ defmodule DstarDemoWeb.OgCardPage do
   defp visual(assigns) do
     assigns =
       assign(assigns,
-        stages: [{1, ""}, {2, ""}, {3, "The sidebar wants to know"}, {4, ""}, {5, ""}],
+        stages: [{1, ""}, {2, ""}, {3, "The sidebar wants to know"}, {4, ""}, {5, ""}, {6, ""}],
         bench: HomePage.bench_memory()
       )
 
