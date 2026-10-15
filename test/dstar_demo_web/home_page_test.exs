@@ -9,12 +9,12 @@ defmodule DstarDemoWeb.HomePageTest do
     :ok
   end
 
-  test "GET / renders five scroll stages, the code and the live inbox", %{
+  test "GET / renders six scroll stages, the code and the live inbox", %{
     conn: conn
   } do
     document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
 
-    for n <- 1..5 do
+    for n <- 1..6 do
       step = LazyHTML.query(document, "#dx-stage-#{n} [data-on-intersect__half]")
       assert LazyHTML.attribute(step, "data-on-intersect__half") == ["$stage = #{n}"]
     end
@@ -52,12 +52,12 @@ defmodule DstarDemoWeb.HomePageTest do
        %{conn: conn} do
     document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
 
-    for lane <- ~w(lv ds), n <- 1..5 do
+    for lane <- ~w(lv ds), n <- 1..6 do
       block = LazyHTML.query(document, "#dx-code-#{lane}-#{n}")
       assert LazyHTML.attribute(block, "data-show") == ["$stage == #{n}"]
     end
 
-    for n <- 1..5 do
+    for n <- 1..6 do
       assert document |> LazyHTML.query("#dx-stage-#{n} details") |> Enum.count() == 1
     end
 
@@ -66,6 +66,30 @@ defmodule DstarDemoWeb.HomePageTest do
     assert stage2 =~ "put_session(conn, :locale, locale)"
     assert stage2 =~ "def on_mount(:default, _params, session, socket)"
     refute document |> LazyHTML.query("#dx-code-ds-2") |> LazyHTML.text() =~ "on_mount"
+  end
+
+  test "stage 5 is navigation: LiveView over the socket, Dstar a full GET", %{conn: conn} do
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
+
+    assert document |> LazyHTML.query("#dx-code-lv-5") |> LazyHTML.text() =~
+             "live \"/inbox/:id\", MessageLive"
+
+    assert document |> LazyHTML.query("#dx-code-ds-5") |> LazyHTML.text() =~
+             "dstar \"/inbox/:id\", MessagePage"
+
+    assert document |> LazyHTML.query("#lv-nav") |> LazyHTML.text() =~ "over the socket"
+    assert document |> LazyHTML.query("#ds-nav") |> LazyHTML.text() =~ "full GET"
+  end
+
+  test "the page says what LiveView's process buys, event order included", %{conn: conn} do
+    document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
+
+    for row <- ~w(navigation event-order state-between-events updates form-recovery cost) do
+      assert document |> LazyHTML.query("#process-#{row}") |> Enum.count() == 1
+    end
+
+    assert document |> LazyHTML.query("#process-event-order") |> LazyHTML.text() =~
+             "at-least-once"
   end
 
   test "the pull request toggle shows both diffs with their file counts", %{conn: conn} do

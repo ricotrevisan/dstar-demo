@@ -52,6 +52,11 @@ defmodule DstarDemoWeb.ExplainedLabPageTest do
     assert body =~ "Someone deployed"
   end
 
+  test "the double-click action reaches the shared lab", %{conn: conn} do
+    body = conn |> post_event("double") |> response(200)
+    assert body =~ "double-clicked"
+  end
+
   test "every reader's stream is told about another reader's action" do
     :ok = Server.subscribe()
     Server.dispatch("click")
