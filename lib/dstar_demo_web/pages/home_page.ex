@@ -4,8 +4,6 @@ defmodule DstarDemoWeb.HomePage do
   @impl Dstar.Page
   def render(assigns) do
     ~H"""
-    <Layouts.flash_group flash={@flash} />
-
     <div class="min-h-screen bg-base-100 text-base-content">
       <div class="mx-auto w-full max-w-[1100px] px-5 py-10 sm:px-8">
         <header class="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 pb-5">
@@ -103,6 +101,9 @@ defmodule DstarDemoWeb.HomePage do
         </section>
       </div>
     </div>
+
+    <%!-- After the content, so crawlers and unfurlers read the H1 first. --%>
+    <Layouts.flash_group flash={@flash} />
     """
   end
 

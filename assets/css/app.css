@@ -141,7 +141,8 @@ html {
 /* ── /explained/dx: the architecture diagram (SVG) ────────────────────── */
 .dx-box { fill: var(--color-base-200); stroke: var(--color-base-300); stroke-width: 1; }
 .dx-box-hot { stroke: var(--color-primary); stroke-width: 1.5; }
-.dx-proc { fill: none; stroke: var(--color-primary); stroke-width: 1.2; stroke-dasharray: 4 3; }
+.dx-proc { fill: none; stroke: var(--color-primary); stroke-width: 1.2; stroke-dasharray: 4 3; transition: height 400ms ease-out; }
+.dx-proc-tall { height: 98px; }
 .dx-text { fill: var(--color-base-content); font-size: 10px; font-family: ui-monospace, monospace; }
 .dx-sub { fill: color-mix(in oklab, var(--color-base-content) 65%, transparent); font-size: 8.5px; font-family: ui-monospace, monospace; }
 .dx-wire { stroke: color-mix(in oklab, var(--color-base-content) 45%, transparent); stroke-width: 1.2; fill: none; }

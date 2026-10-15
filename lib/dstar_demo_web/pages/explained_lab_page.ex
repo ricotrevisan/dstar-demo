@@ -18,7 +18,19 @@ defmodule DstarDemoWeb.ExplainedLabPage do
 
   @impl Dstar.Page
   def mount(conn, _params) do
-    assign(conn, page_title: "The chaos lab — break LiveView and Dstar", lab: Server.get())
+    assign(conn,
+      page_title: "The chaos lab: break LiveView and Dstar",
+      meta: %{
+        description:
+          "The same inbox, built with Phoenix LiveView and with Dstar, open in six tabs each. Deploy, drive a tab into a tunnel, revoke a session, and read the benchmark.",
+        path: ~p"/explained/lab",
+        image: "/images/og/explained-lab.png",
+        image_alt: "The chaos lab: six tabs in LiveView and six in Dstar",
+        type: "article",
+        published: ~D[2026-10-14]
+      },
+      lab: Server.get()
+    )
   end
 
   @impl Dstar.Page
@@ -53,10 +65,14 @@ defmodule DstarDemoWeb.ExplainedLabPage do
       })
 
     ~H"""
-    <Layouts.flash_group flash={@flash} />
-
     <.article_shell>
-      <.lede eyebrow="Explainer 3 · the chaos lab" title="Go ahead, break it">
+      <.lede eyebrow="The chaos lab" title="Go ahead, break it">
+        <:dek>
+          <a href="https://hexdocs.pm/dstar">Dstar</a>
+          renders Phoenix pages over <a href="https://data-star.dev">Datastar</a>: the browser
+          sends signals, the server answers with HTML patches over SSE, and there's no
+          client-side app.
+        </:dek>
         <p>
           Below are two copies of the same inbox app, one built with LiveView and one with
           Dstar. Each is open in six browser tabs, and every tab shows a live unread badge.
@@ -138,7 +154,12 @@ defmodule DstarDemoWeb.ExplainedLabPage do
           <.xp_link href={~p"/explained/dx"}>Follow the arrows</.xp_link>
         </.para>
       </section>
+
+      <.try_dstar lab_link={false} />
     </.article_shell>
+
+    <%!-- After the content, so crawlers and unfurlers read the H1 first. --%>
+    <Layouts.flash_group flash={@flash} />
     """
   end
 
@@ -372,7 +393,7 @@ defmodule DstarDemoWeb.ExplainedLabPage do
       data-signals={Jason.encode!(%{benchTabs: to_string(@first)})}
     >
       <div class="max-w-[68ch]">
-        <.section_heading>Counted above. Measured here.</.section_heading>
+        <.section_heading id="benchmark">Counted above. Measured here.</.section_heading>
         <.para>{render_slot(@inner_block)}</.para>
       </div>
 
