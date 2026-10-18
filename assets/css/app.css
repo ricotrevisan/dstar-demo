@@ -104,6 +104,12 @@
 
 /* This file is for your main application CSS */
 
+/* Cross-fade full page loads between our own pages. Browsers without
+   cross-document view transitions just navigate as before. */
+@media (prefers-reduced-motion: no-preference) {
+  @view-transition { navigation: auto; }
+}
+
 html {
   scrollbar-gutter: stable;
   background: var(--color-base-100);
