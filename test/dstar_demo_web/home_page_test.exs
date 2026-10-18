@@ -159,7 +159,7 @@ defmodule DstarDemoWeb.HomePageTest do
     document = conn |> get(~p"/") |> html_response(200) |> LazyHTML.from_document()
 
     assert document |> LazyHTML.query("h1") |> LazyHTML.text() =~
-             "Interactive, without staying connected"
+             "Simple and reactive Phoenix pages"
 
     assert "/showcase" in (document |> LazyHTML.query("header a") |> LazyHTML.attribute("href"))
   end
