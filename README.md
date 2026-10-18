@@ -1,4 +1,24 @@
-# DstarDemo
+# Dstar demo
+
+Simple and reactive Phoenix pages.
+
+[Dstar](https://hexdocs.pm/dstar) renders Phoenix pages over
+[Datastar](https://data-star.dev). A click is an ordinary request: it goes
+through your router, runs a handler, and comes back as HTML patches for
+whatever changed. Nothing stays open between clicks. When a page needs live
+updates, one attribute opens a stream.
+
+This repo is the site at https://dstar.nocode-to-knowcode.com:
+
+- `/`: an inbox built with LiveView 1.8 and with Dstar, arrow by arrow
+- `/explained/lab`: the same inbox in six tabs, to break on purpose
+- `/showcase`: small examples of each Dstar feature
+- `bench/`: a reproducible LiveView vs Dstar benchmark
+
+Library: [github.com/ricotrevisan/dstar](https://github.com/ricotrevisan/dstar).
+Found a rough edge? [Open an issue](https://github.com/ricotrevisan/dstar-demo/issues).
+
+## Run it
 
 To start your Phoenix server:
 
@@ -24,11 +44,3 @@ in the log until it comes back. `mix test` does need it, since the suite runs
 inside `Ecto.Adapters.SQL.Sandbox`.
 
 Ready to run in production? Please [check our deployment guides](https://hexdocs.pm/phoenix/deployment.html).
-
-## Learn more
-
-* Official website: https://www.phoenixframework.org/
-* Guides: https://hexdocs.pm/phoenix/overview.html
-* Docs: https://hexdocs.pm/phoenix
-* Forum: https://elixirforum.com/c/phoenix-forum
-* Source: https://github.com/phoenixframework/phoenix

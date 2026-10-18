@@ -32,13 +32,13 @@ defmodule DstarDemoWeb.HomePage do
   @impl Dstar.Page
   def mount(conn, _params) do
     assign(conn,
-      page_title: "Interactive, without staying connected: Dstar for Phoenix",
+      page_title: "Simple and reactive Phoenix pages: Dstar",
       meta: %{
         description:
-          "Dstar makes Phoenix pages interactive without a socket: every click is a request answered with HTML patches, and live updates are one attribute where you need them. An inbox built with LiveView 1.8 and with Dstar, arrow by arrow.",
+          "Dstar keeps Phoenix pages simple and reactive: every click is a request answered with HTML patches, and live updates are one attribute where you need them. An inbox built with LiveView 1.8 and with Dstar, arrow by arrow.",
         path: ~p"/",
         image: "/images/og/home.png",
-        image_alt: "Interactive, without staying connected: an inbox in LiveView and in Dstar",
+        image_alt: "Simple and reactive Phoenix pages: an inbox in LiveView and in Dstar",
         type: "article",
         published: ~D[2026-10-14]
       },
@@ -122,7 +122,7 @@ defmodule DstarDemoWeb.HomePage do
     <.article_shell signals={%{stage: 1, dxFiles: "lv", dxLane: "ds", dxPr: "lv", dxView: "diagram"}}>
       <.lede
         eyebrow="An inbox grows up"
-        title="Interactive, without staying connected"
+        title="Simple and reactive Phoenix pages"
         byline="Rico Trevisan · October 2026"
       >
         <:dek>
@@ -138,7 +138,7 @@ defmodule DstarDemoWeb.HomePage do
           tab is.
         </p>
         <p>
-          Dstar is a third option. A click is an ordinary request: it goes through your router,
+          Dstar is a third option, and it aims to be the simple one. A click is an ordinary request: it goes through your router,
           runs a handler, and comes back as HTML patches for whatever changed, wherever it is on
           the page. Nothing stays open between clicks. When a page needs to hear about changes
           it didn't make, you add one attribute, and it opens a stream.
