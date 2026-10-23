@@ -8,7 +8,7 @@ defmodule DstarDemoWeb.Explainers do
   @explainers [
     %{
       path: "/",
-      title: "Interactive, without staying connected",
+      title: "Simple and reactive Phoenix pages",
       kicker: "An inbox grows up",
       summary:
         "Login, a layout badge, live tabs and a deploy, built with Phoenix LiveView 1.8 and with Dstar. What staying connected costs, and who pays it.",
