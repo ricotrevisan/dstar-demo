@@ -1,8 +1,8 @@
 defmodule ExplainerBench.MixProject do
   use Mix.Project
 
-  # Versions are pinned to what dstar-demo ships, so the numbers describe
-  # the same stack the explainer pages run on.
+  # Keep the comparison's Phoenix stack pinned; resolve released Dstar
+  # alongside the demo. Historical results record their original versions.
   def project do
     [
       app: :explainer_bench,
@@ -24,7 +24,7 @@ defmodule ExplainerBench.MixProject do
       {:phoenix_live_view, "1.1.33"},
       {:bandit, "1.12.4"},
       {:jason, "~> 1.2"},
-      {:dstar, github: "ricotrevisan/dstar", ref: "91db2de4882669a85492aeef2fcaee1e5382d489"},
+      {:dstar, "~> 0.3.2"},
       # Load generator only.
       {:mint, "~> 1.6"},
       {:mint_web_socket, "~> 1.0"}
