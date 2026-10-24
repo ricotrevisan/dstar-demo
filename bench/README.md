@@ -158,6 +158,7 @@ bench/
 └── results/                       # committed results, one dir per run
 ```
 
-The versions are pinned to what dstar-demo ships (Phoenix 1.8.11,
-LiveView 1.1.33, Bandit 1.12.4, dstar `91db2de`), so the numbers describe
-the stack the explainer pages run on.
+The benchmark pins Phoenix 1.8.11, LiveView 1.1.33 and Bandit 1.12.4,
+and uses released Dstar `~> 0.3.2` (resolved in `mix.lock`). Historical
+results retain the versions recorded in their JSON; rerunning uses the
+current benchmark lockfile, not necessarily the demo's Phoenix stack.
