@@ -17,7 +17,7 @@ defmodule DstarDemoWeb.OgCardPage do
   @cards %{
     "home" => %{
       kicker: "Dstar for Phoenix",
-      title: "Interactive, without staying connected",
+      title: "Simple and reactive Phoenix pages",
       dek: "Every click is a request. Live is one attribute, where you need it."
     },
     "explained-lab" => %{
@@ -98,7 +98,7 @@ defmodule DstarDemoWeb.OgCardPage do
       )
 
     ~H"""
-    <div class="mx-auto w-[400px] [&_#dx-diagram>div:first-child]:hidden [&_#dx-diagram>p:last-child]:hidden">
+    <div class="mx-auto w-[400px] scale-[0.9] [&_#dx-diagram>div:first-child]:hidden [&_#dx-diagram>div:last-child>p:last-child]:hidden">
       <HomePage.arrows stages={@stages} bench={@bench} />
     </div>
     """
